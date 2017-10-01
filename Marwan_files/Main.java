@@ -8,9 +8,6 @@ import java.lang.String;
 
 public class Main {
 
-//    private static final String filePath = "/Users/elieh/IdeaProjects/ASMProject/out/production/ASMProject/com/asmproj/Testing.class";
-
-
     public static void main(String[] args) throws IOException {
         if (args.length != 1) {
             System.out.println("Provide a path to the class file as argument");
