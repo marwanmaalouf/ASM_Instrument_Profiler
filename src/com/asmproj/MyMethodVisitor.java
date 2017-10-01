@@ -118,7 +118,7 @@ public class MyMethodVisitor extends MethodVisitor {
         super.visitLdcInsn("var" + index);
         super.visitLdcInsn(mCounter);
         super.visitLdcInsn(mMethodName);
-        super.visitMethodInsn(Opcodes.INVOKESTATIC, "IFProfiler", methodHandler, arguments, false);
+        super.visitMethodInsn(Opcodes.INVOKESTATIC, "com.asmproj.IFProfiler", methodHandler, arguments, false);
     }
 
     @Override
@@ -145,7 +145,7 @@ public class MyMethodVisitor extends MethodVisitor {
             super.visitVarInsn(Opcodes.ILOAD, index);
             super.visitLdcInsn(mCounter);
             super.visitLdcInsn(mMethodName);
-            super.visitMethodInsn(Opcodes.INVOKESTATIC, "IFProfiler", "handleArrayElementDefINT", "(Ljava/lang/Object;IIILjava/lang/String;)V", false);
+            super.visitMethodInsn(Opcodes.INVOKESTATIC, "com.asmproj.IFProfiler", "handleArrayElementDefINT", "(Ljava/lang/Object;IIILjava/lang/String;)V", false);
             super.visitVarInsn(Opcodes.ILOAD, index);
         }
 

@@ -1,7 +1,8 @@
 package com.asmproj;
 
 import org.objectweb.asm.*;
-
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.io.*;
 
 import java.lang.String;
@@ -16,7 +17,10 @@ public class Main {
             System.out.println("Provide a path to the class file as argument");
             return;
         }
-        String filePath = args[0];
+        
+        Path currentRelativePath = Paths.get("");
+		String filePath = currentRelativePath.toAbsolutePath().toString() + args[0];
+		System.out.println("Loading: " + filePath);
         InputStream in = new FileInputStream(filePath);
         ClassReader classReader = new ClassReader(in);
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
