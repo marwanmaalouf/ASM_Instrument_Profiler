@@ -1,4 +1,3 @@
-package com.asmproj;
 
 import org.objectweb.asm.*;
 import java.nio.file.Path;
