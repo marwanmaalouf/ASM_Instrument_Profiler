@@ -4,15 +4,15 @@
 
 Check out from Version control -> Github -> log in -> find ASMProject.git
 
-In some cases, You might need to add the ASM Jar files to the project:
+In some cases, You might need to add the ASM Jar files to the project:  
 file -> Project Structure -> Libraries -> add -> java -> select all ASM Jar files found in src/lib
 
 ## Running using IntelliJ
 
-Build Testing.java (Right click -> Compile)
+Build Testing.java (Right click -> Compile)  
 Build Main and provide args, being the filepath to Testing.class or any other class found in out/.. (Do so via config editor)
-Run Main
-(Optional) Checkout changes in the decompiled Testing.class under out/..
+Run Main  
+(Optional) Checkout changes in the decompiled Testing.class under out/..  
 Run Testing
 
 ## How to run using command line
