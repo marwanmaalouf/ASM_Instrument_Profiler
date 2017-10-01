@@ -1,4 +1,4 @@
 cls
 echo "Building files ..."
-javac -cp "./*" src/com/asmproj/*.java
+javac -d out -cp "./src/libs/*";"./" src/com/asmproj/*.java
 

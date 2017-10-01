@@ -21,7 +21,7 @@ public class MyMethodVisitor extends MethodVisitor {
 
 
     protected int m_localLocationCount;
-    //    protected LocalInfo[] m_localLocation;
+    protected LocalInfo[] m_localLocation;
     protected int m_nLocals;
 
     protected String m_strParamWrapper;
@@ -49,6 +49,8 @@ public class MyMethodVisitor extends MethodVisitor {
         super.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
         super.visitLdcInsn("method: " + mMethodName);
         super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+        m_localLocationCount = 0;
+        m_localLocation = new LocalInfo[100000];
     }
 
     @Override
@@ -113,24 +115,58 @@ public class MyMethodVisitor extends MethodVisitor {
         mCounter++;
     }
 
-    protected void LoadOrStore(int index, String methodHandler, String arguments) {
+    protected void LoadOrStore(int index, String methodHandler, String arguments){
         super.visitLdcInsn(index);
         super.visitLdcInsn("var" + index);
         super.visitLdcInsn(mCounter);
         super.visitLdcInsn(mMethodName);
-        super.visitMethodInsn(Opcodes.INVOKESTATIC, "com.asmproj.IFProfiler", methodHandler, arguments, false);
+        super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", methodHandler, arguments, false);
+        
+        saveLocalLocation(mCounter, mCounter - 5, "var" + index);
     }
 
     @Override
-    public void visitFieldInsn(int opcode, String owner, String name, String desc) {
-        System.out.println(owner);
-        System.out.println(name);
-        System.out.println(desc);
-        if (opcode == Opcodes.GETFIELD) {
+    public void visitFieldInsn(int opcode, String owner, String name, String desc){
+        System.out.println("Field instruction: {owner: " + owner + " name: " + name + " desc: " + desc + " }");
+        
+        if(opcode == Opcodes.GETFIELD){
+            System.out.println("found getfield\n");
+            Type fieldType = Type.getType(desc);
+            
+            int tempindex = mLocalVariablesSorter.newLocal(Type.getType( (new Object()).getClass() ));
+            mCounter += 10;
+            
+            super.visitVarInsn(Opcodes.ASTORE, tempindex);
+            super.visitVarInsn(Opcodes.ALOAD, tempindex);
+            super.visitInsn(Opcodes.DUP);
+            super.visitFieldInsn(Opcodes.GETFIELD, owner, name, desc);
+            super.visitLdcInsn(fieldType.getClassName());
+            super.visitLdcInsn(name);
+            super.visitLdcInsn(mCounter);
+            super.visitLdcInsn(mMethodName);
+            
+            if(fieldType.equals(Type.INT_TYPE) || fieldType.equals(Type.CHAR_TYPE) || fieldType.equals(Type.BOOLEAN_TYPE)
+                    || fieldType.equals(Type.SHORT_TYPE)){
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldUseINT", "(Ljava/lang/Object;ILjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", false);
+            }else if(fieldType.equals(Type.DOUBLE_TYPE)){
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldUseDOUBLE", "(Ljava/lang/Object;DLjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", false);
 
+            }else if(fieldType.equals(Type.FLOAT_TYPE)){
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldUseFLOAT", "(Ljava/lang/Object;FLjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", false);
+
+            }else if(fieldType.equals(Type.LONG_TYPE)){
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldUseLONG", "(Ljava/lang/Object;JLjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", false);
+
+            }else{// reference type
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldObjectUse", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", false);
+
+            }
+            
+            super.visitVarInsn(Opcodes.ALOAD, tempindex);
         }
+        super.visitFieldInsn(opcode, owner, name, desc);
+        mCounter++;
     }
-
 
     @Override
     public void visitInsn(int opcode) {
@@ -145,7 +181,7 @@ public class MyMethodVisitor extends MethodVisitor {
             super.visitVarInsn(Opcodes.ILOAD, index);
             super.visitLdcInsn(mCounter);
             super.visitLdcInsn(mMethodName);
-            super.visitMethodInsn(Opcodes.INVOKESTATIC, "com.asmproj.IFProfiler", "handleArrayElementDefINT", "(Ljava/lang/Object;IIILjava/lang/String;)V", false);
+            super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleArrayElementDefINT", "(Ljava/lang/Object;IIILjava/lang/String;)V", false);
             super.visitVarInsn(Opcodes.ILOAD, index);
         }
 
@@ -153,5 +189,15 @@ public class MyMethodVisitor extends MethodVisitor {
         mCounter++;
     }
 
+
+    void saveLocalLocation(int loadOrStore, int push, String oldName)
+    {
+        m_localLocation[m_localLocationCount] = new LocalInfo();
+        m_localLocation[m_localLocationCount].pushLocation = push; // instruction number
+        m_localLocation[m_localLocationCount].loadOrStoreLocation = loadOrStore; // instruction number
+        m_localLocation[m_localLocationCount].oldName = oldName;
+
+        m_localLocationCount++;
+    }
 
 }
