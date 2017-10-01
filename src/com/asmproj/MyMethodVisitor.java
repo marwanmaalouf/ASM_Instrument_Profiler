@@ -123,6 +123,7 @@ public class MyMethodVisitor extends MethodVisitor {
         super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", methodHandler, arguments, false);
         
         saveLocalLocation(mCounter, mCounter - 5, "var" + index);
+
     }
 
     @Override
