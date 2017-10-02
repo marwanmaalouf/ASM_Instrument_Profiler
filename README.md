@@ -4,11 +4,16 @@
 
 Check out from Version control -> Github -> log in -> find ASMProject.git
 
-You might need to add the ASM Jar files to the project:
+In some cases, You might need to add the ASM Jar files to the project:  
+file -> Project Structure -> Libraries -> add -> java -> select all ASM Jar files found in src/lib
 
-file -> Project Structure -> Libraries -> add -> java -> select all ASM Jar files
-Make sure you download ASM 6 jar files if using JDK 9, but use Opcodes 5 while working.
+## Running using IntelliJ
 
+Build Testing.java (Right click -> Compile)  
+Build Main and provide args, being the filepath to Testing.class or any other class found in out/.. (Do so via config editor)
+Run Main  
+(Optional) Checkout changes in the decompiled Testing.class under out/..  
+Run Testing
 
 ## How to run using command line
 Use the bat files provided:
@@ -31,4 +36,7 @@ This part reflects the next steps to be addressed (@Elie please put the list you
 	. PUTFIELD -- @Johnny
 	. Array Element Def-Use (primitive types and object instances) -- @Elie @Samir
 	. <Put the list here>
+	
+## Useful Links
+[Java Bytecode Instructions List](https://en.wikipedia.org/wiki/Java_bytecode_instruction_listings)
 
