@@ -127,11 +127,8 @@ public class MyMethodVisitor extends MethodVisitor {
     }
 
     @Override
-    public void visitFieldInsn(int opcode, String owner, String name, String desc){
-        System.out.println("Field instruction: {owner: " + owner + " name: " + name + " desc: " + desc + " }");
-        
+    public void visitFieldInsn(int opcode, String owner, String name, String desc){        
         if(opcode == Opcodes.GETFIELD){
-            System.out.println("found getfield\n");
             Type fieldType = Type.getType(desc);
             
             int tempindex = mLocalVariablesSorter.newLocal(Type.getType( (new Object()).getClass() ));
@@ -164,6 +161,33 @@ public class MyMethodVisitor extends MethodVisitor {
             }
             
             super.visitVarInsn(Opcodes.ALOAD, tempindex);
+        } else if(opcode == Opcodes.GETSTATIC){ //GETSTATIC
+            Type fieldType = Type.getType(desc);
+
+        	mCounter += 6;
+        	super.visitFieldInsn(opcode, owner, name, desc);
+        	super.visitLdcInsn(fieldType.getClassName());
+        	super.visitLdcInsn(name);
+        	super.visitLdcInsn(mCounter);
+        	super.visitLdcInsn(mMethodName);
+        	
+        	if(fieldType.equals(Type.INT_TYPE) || fieldType.equals(Type.CHAR_TYPE) || fieldType.equals(Type.BOOLEAN_TYPE)
+                    || fieldType.equals(Type.SHORT_TYPE)){
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldUseINT", "(ILjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", false);
+            }else if(fieldType.equals(Type.DOUBLE_TYPE)){
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldUseDOUBLE", "(DLjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", false);
+
+            }else if(fieldType.equals(Type.FLOAT_TYPE)){
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldUseFLOAT", "(FLjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", false);
+
+            }else if(fieldType.equals(Type.LONG_TYPE)){
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldUseLONG", "(JLjava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", false);
+
+            }else{// reference type
+                super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldObjectUse", "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)V", false);
+            }
+        	
+        	
         }
         super.visitFieldInsn(opcode, owner, name, desc);
         mCounter++;

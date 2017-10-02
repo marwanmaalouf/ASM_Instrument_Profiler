@@ -78,6 +78,7 @@ public class IFProfiler
 
     public static void handleStaticFieldDefINT(int value, String defParam, int defInstruction, String methodSignature)
     {
+    	
     }
     public static void handleStaticFieldDefLONG(long value, String defParam, int defInstruction, String methodSignature)
     {
@@ -111,20 +112,28 @@ public class IFProfiler
     }
 
     public static void handleInstanceFieldUseINT(Object instance, int value, String declaringClass, String fieldName, int useInstruction, String methodSignature)
-    {
+    {        
+    	System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
+
     }
     public static void handleInstanceFieldUseLONG(Object instance, long value, String declaringClass, String fieldName, int useInstruction, String methodSignature)
-    {
+    {        
+    	System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
+
     }
     public static void handleInstanceFieldUseFLOAT(Object instance, float value, String declaringClass, String fieldName, int useInstruction, String methodSignature)
     {
+        System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
+
     }
     public static void handleInstanceFieldUseDOUBLE(Object instance, double value, String declaringClass, String fieldName, int useInstruction, String methodSignature)
     {
+        System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
+
     }
     public static void handleInstanceFieldObjectUse(Object instance, Object theObject, String declaringClass, String fieldName, int useInstruction, String methodSignature)
     {
-        System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + theObject + " method: " + methodSignature + " inst#: " + useInstruction);
+        System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + theObject + " method: " + methodSignature + " inst#: " + useInstruction + "}");
     }
 
     public static void handleInstanceMethodCall(Object instance, String calledMethodName, String calledMethodSignature, int numberOfParameters, int callInstruction, boolean bReturnsValue, String methodSignature)
@@ -206,18 +215,26 @@ public class IFProfiler
 
     public static void handleStaticFieldUseINT(int value, String className, String fieldName, int useInstruction, String methodSignature)
     {
+        System.out.println("Static Field use: {name: " + fieldName + " class: " + className + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
     }
     public static void handleStaticFieldUseLONG(long value, String className, String fieldName, int useInstruction, String methodSignature)
     {
+        System.out.println("Static Field use: {name: " + fieldName + " class: " + className + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
     }
     public static void handleStaticFieldUseFLOAT(float value, String className, String fieldName, int useInstruction, String methodSignature)
     {
+        System.out.println("Static Field use: {name: " + fieldName + " class: " + className + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
+
     }
     public static void handleStaticFieldUseDOUBLE(double value, String className, String fieldName, int useInstruction, String methodSignature)
     {
+        System.out.println("Static Field use: {name: " + fieldName + " class: " + className + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
+
     }
     public static void handleStaticFieldObjectUse(Object theObject, String className, String fieldName, int useInstruction, String methodSignature)
     {
+        System.out.println("Static Field use: {name: " + fieldName + " class: " + className + " value: " + theObject + " method: " + methodSignature + " inst#: " + useInstruction + "}");
+
     }
 
 
