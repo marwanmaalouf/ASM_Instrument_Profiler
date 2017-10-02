@@ -6,7 +6,9 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.LocalVariablesSorter;
 import org.objectweb.asm.tree.MethodNode;
 
+import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.List;
 
 
 public class MyMethodVisitor extends MethodVisitor {
@@ -115,6 +117,42 @@ public class MyMethodVisitor extends MethodVisitor {
         mCounter++;
     }
 
+    @Override 
+    public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf){
+    	_nTotalProbes++;
+    	
+    	if(opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE){
+    		String calledClassName = owner;
+    		String calledMethodName = name;
+			String calledMethodSignature = "";
+			Type [] argumentTypes = Type.getArgumentTypes(desc); // get type of arguments
+			Type returnType = Type.getReturnType(desc); // get return type
+			int [] localVariableIndexes = new int[argumentTypes.length];
+			boolean bReturnsValue = !(returnType.equals(Type.VOID_TYPE));
+			
+			System.out.println(Type.getType(Type.class));
+			for(int i = 0; i < argumentTypes.length; i++){
+				localVariableIndexes[i] = mLocalVariablesSorter.newLocal(argumentTypes[i]);
+			}
+			int instanceVariableIndex = mLocalVariablesSorter.newLocal(Type.getType(Object.class));
+				
+				
+			
+			
+			System.out.println("Owner: " + owner);
+			System.out.println("Name: " + name);
+			System.out.println("Desc: " + desc);
+			System.out.println("arguments: " );
+			for(Type type: argumentTypes){
+				System.out.println('\t' + type.toString());
+			}
+			System.out.println("returns: " + returnType);
+			System.out.println("----------------------------");
+    	}
+    	super.visitMethodInsn(opcode, owner, name, desc, itf);
+    	mCounter++;
+    }
+    
     protected void LoadOrStore(int index, String methodHandler, String arguments){
         super.visitLdcInsn(index);
         super.visitLdcInsn("var" + index);

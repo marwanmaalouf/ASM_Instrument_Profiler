@@ -22,7 +22,10 @@ public class Testing_2 {
 
 	class Scheduler{
 		myInterface element = new myclass();
-
+		int test_element = 10;
+		
+		String someString = "test passed !";
+		
 		public Scheduler(){
 			Object result = element.execute();
 			System.out.println(result);
@@ -44,8 +47,10 @@ public class Testing_2 {
 		foo(x);
 		Testing_2 test = new Testing_2();
 		myscheduler = test.new Scheduler();
-		System.out.println(myscheduler.element);
-	      
+		System.out.println(myscheduler.test_element);
+		System.out.println(myscheduler.element.toString());
+		System.out.println(myscheduler.someString);
+	     
 	}
 
 	public static String  foo(int x)
