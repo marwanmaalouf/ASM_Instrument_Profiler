@@ -27,6 +27,7 @@ public class MyClassVisitor extends ClassVisitor {
     @Override
     public MethodVisitor visitMethod(int access, final String name, String desc, String signature, String[] exceptions) {
         System.out.println("Visiting method: " + name);
+        System.out.println("Visiting signature: " + signature);
         MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions);
         return new MyMethodVisitor(api, mv, access, name, desc, signature, exceptions);
     }

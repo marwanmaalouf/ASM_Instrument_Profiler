@@ -1,21 +1,24 @@
 package com.asmproj;
 
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.LocalVariablesSorter;
 import org.objectweb.asm.tree.MethodNode;
 
-import java.util.ArrayList;
 import java.util.Hashtable;
-import java.util.List;
 
+
+// TODO: we need to find a solution for mSignature. we need to map m_strMethodSignature to desc
 
 public class MyMethodVisitor extends MethodVisitor {
 
-    private final String mMethodName;
-    private final MethodNode mMethodNode;
-    private final LocalVariablesSorter mLocalVariablesSorter;
+    protected final String mMethodName;
+    protected final String mMethodSignature;
+    protected final MethodNode mMethodNode;
+    protected final LocalVariablesSorter mLocalVariablesSorter;
 
     protected int mCounter = 0;// need to increment it at the end of each visit
 
@@ -27,7 +30,6 @@ public class MyMethodVisitor extends MethodVisitor {
     protected int m_nLocals;
 
     protected String m_strParamWrapper;
-    protected String m_strMethodSignature;
     protected static Hashtable _anyHash1 = new Hashtable();
     protected static Hashtable _anyHash2 = new Hashtable();
 
@@ -42,14 +44,14 @@ public class MyMethodVisitor extends MethodVisitor {
         mMethodNode = new MethodNode(access, signature, signature, signature, exceptions);
         mLocalVariablesSorter = new LocalVariablesSorter(access, desc, mv);
         mMethodName = name;
-        this.m_strMethodSignature = signature;// TODO: gives null
+        mMethodSignature = desc;
     }
 
     @Override
     public void visitCode() {
         super.visitCode();
         super.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-        super.visitLdcInsn("method: " + mMethodName);
+        super.visitLdcInsn("method: " + mMethodName + " " + mMethodSignature);
         super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
         m_localLocationCount = 0;
         m_localLocation = new LocalInfo[100000];
@@ -124,21 +126,82 @@ public class MyMethodVisitor extends MethodVisitor {
     	if(opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE){
     		String calledClassName = owner;
     		String calledMethodName = name;
-			String calledMethodSignature = "";
+			String calledMethodSignature = desc;
 			Type [] argumentTypes = Type.getArgumentTypes(desc); // get type of arguments
 			Type returnType = Type.getReturnType(desc); // get return type
 			int [] localVariableIndexes = new int[argumentTypes.length];
 			boolean bReturnsValue = !(returnType.equals(Type.VOID_TYPE));
 			
-			System.out.println(Type.getType(Type.class));
-			for(int i = 0; i < argumentTypes.length; i++){
-				localVariableIndexes[i] = mLocalVariablesSorter.newLocal(argumentTypes[i]);
-			}
-			int instanceVariableIndex = mLocalVariablesSorter.newLocal(Type.getType(Object.class));
-				
-				
+//			for(int i = 0; i < argumentTypes.length; i++){
+//				localVariableIndexes[i] = mLocalVariablesSorter.newLocal(argumentTypes[i]);
+//				System.out.println(localVariableIndexes[i] + ", " + argumentTypes[i]);
+//
+//			}
+//			int instanceVariableIndex =
+//					mLocalVariablesSorter.newLocal(Type.getType((new Object()).getClass()));
+//
+//			
+//			if(argumentTypes.length > 0){
+//				System.out.println("has argument");
+//				mCounter += argumentTypes.length;
+//				for (int i = argumentTypes.length - 1; i >= 0; i--){
+//					super.visitVarInsn(createStore(argumentTypes[i]), localVariableIndexes[i]);
+//				}
+//				super.visitInsn(Opcodes.DUP);
+//				mCounter += 1;
+//			}else{
+//				System.out.println("no argument");
+//				super.visitInsn(Opcodes.DUP);
+//				mCounter += 1;
+//			}
+//			
+//			// Save the instance
+//			mCounter += 1;
+//			super.visitVarInsn(Opcodes.ASTORE, instanceVariableIndex);
+//			
+//			mCounter += 8;
+//			int callInstruction = mCounter + argumentTypes.length; // include the loads
+//			super.visitVarInsn(Opcodes.ALOAD, instanceVariableIndex);
+//			super.visitLdcInsn(calledMethodName);
+//			super.visitLdcInsn(calledMethodSignature);
+//			super.visitLdcInsn(argumentTypes.length);
+//			super.visitLdcInsn(callInstruction);
+//			super.visitLdcInsn(bReturnsValue);
+//			super.visitLdcInsn(mMethodSignature);
+//			super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceMethodCall", 
+//					"(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;IIZLjava/lang/String;)V", false);
+//
+//			
+//			// Restore the method arguments
+//			for (int j = 0; j < argumentTypes.length; j++)
+//			{
+//				super.visitVarInsn(createLoad(argumentTypes[j]), localVariableIndexes[j]);
+//			}
 			
-			
+//			
+//				// Get handle to the instruction after the invoke.  Note that the invoke can't be the last instruction.
+//				InstructionHandle next = h.getNext();
+//				_nTotalStatements++;
+//
+//				// Set up call to Profiler.handleInstanceMethodReturn().
+//				m_i = callInstruction + 8;
+//				m_instructionList.insert(next, _factory.createLoad(Type.OBJECT, instanceVariable.getIndex()));
+//				m_instructionList.insert(next, new PUSH(_cpg, calledClassName));
+//				m_instructionList.insert(next, new PUSH(_cpg, calledMethodName));
+//				m_instructionList.insert(next, new PUSH(_cpg, calledMethodSignature));
+//				m_instructionList.insert(next, new PUSH(_cpg, callInstruction));
+//				m_instructionList.insert(next, new PUSH(_cpg, bReturnsValue));
+//				m_instructionList.insert(next, new PUSH(_cpg, m_strMethodSignature));
+//				m_instructionList.insert(next, _factory.createInvoke("InformationFlow.IFProfiler", "handleInstanceMethodReturn",
+//						Type.VOID, new Type[] { Type.OBJECT, Type.STRING, Type.STRING, Type.STRING, Type.INT, Type.BOOLEAN, Type.STRING }, INVOKESTATIC));
+//
+//				m_instructionList.redirectBranches(h, localNewTarget);h
+//				updateHandlerTarget(h, localNewTarget);
+//
+//				h = next.getPrev();	
+//			 **/
+//			
+//			
 			System.out.println("Owner: " + owner);
 			System.out.println("Name: " + name);
 			System.out.println("Desc: " + desc);
@@ -153,16 +216,19 @@ public class MyMethodVisitor extends MethodVisitor {
     	mCounter++;
     }
     
-    protected void LoadOrStore(int index, String methodHandler, String arguments){
-        super.visitLdcInsn(index);
-        super.visitLdcInsn("var" + index);
-        super.visitLdcInsn(mCounter);
-        super.visitLdcInsn(mMethodName);
-        super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", methodHandler, arguments, false);
-        
-        saveLocalLocation(mCounter, mCounter - 5, "var" + index);
-
+    @Override
+    public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs){
+        super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
+        mCounter++;
     }
+
+    @Override
+    public void visitJumpInsn(int opcode, Label label){
+        super.visitJumpInsn(opcode, label);
+        mCounter++;
+    }
+
+
 
     @Override
     public void visitFieldInsn(int opcode, String owner, String name, String desc){        
@@ -179,7 +245,7 @@ public class MyMethodVisitor extends MethodVisitor {
             super.visitLdcInsn(fieldType.getClassName());
             super.visitLdcInsn(name);
             super.visitLdcInsn(mCounter);
-            super.visitLdcInsn(mMethodName);
+            super.visitLdcInsn(mMethodSignature);
             
             if(fieldType.equals(Type.INT_TYPE) || fieldType.equals(Type.CHAR_TYPE) || fieldType.equals(Type.BOOLEAN_TYPE)
                     || fieldType.equals(Type.SHORT_TYPE)){
@@ -207,7 +273,7 @@ public class MyMethodVisitor extends MethodVisitor {
         	super.visitLdcInsn(fieldType.getClassName());
         	super.visitLdcInsn(name);
         	super.visitLdcInsn(mCounter);
-        	super.visitLdcInsn(mMethodName);
+        	super.visitLdcInsn(mMethodSignature);
         	
         	if(fieldType.equals(Type.INT_TYPE) || fieldType.equals(Type.CHAR_TYPE) || fieldType.equals(Type.BOOLEAN_TYPE)
                     || fieldType.equals(Type.SHORT_TYPE)){
@@ -243,7 +309,7 @@ public class MyMethodVisitor extends MethodVisitor {
             super.visitInsn(Opcodes.DUP2);
             super.visitVarInsn(Opcodes.ILOAD, index);
             super.visitLdcInsn(mCounter);
-            super.visitLdcInsn(mMethodName);
+            super.visitLdcInsn(mMethodSignature);
             super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleArrayElementDefINT", "(Ljava/lang/Object;IIILjava/lang/String;)V", false);
             super.visitVarInsn(Opcodes.ILOAD, index);
         }
@@ -253,6 +319,63 @@ public class MyMethodVisitor extends MethodVisitor {
     }
 
 
+    
+    
+    /**
+     * Helper function, returns the XSTORE Opcode corresponding to the given type
+     * @param t: Type of the object to be stored
+     * @return
+     */
+    protected int createStore(Type t){
+    	int opcode = -1;
+    	if(t.equals(Type.BYTE_TYPE) || t.equals(Type.BOOLEAN_TYPE) || t.equals(Type.CHAR_TYPE) 
+    			|| t.equals(Type.SHORT_TYPE) || t.equals(Type.INT_TYPE)){
+    		opcode = Opcodes.ISTORE;
+    	}else if(t.equals(Type.DOUBLE_TYPE)){
+    		opcode = Opcodes.DSTORE;
+    	}else if(t.equals(Type.FLOAT_TYPE)){
+    		opcode = Opcodes.FSTORE;
+    	}else if(t.equals(Type.LONG_TYPE)){
+    		opcode = Opcodes.LSTORE;
+    	}else{
+    		opcode = Opcodes.ASTORE; 
+    	}
+    	return opcode;
+    }
+    
+    /**
+     * Helper function, returns the XLOAD Opcode corresponding to the given type
+     * @param t: Type of the object to be stored
+     * @return
+     */
+    protected int createLoad(Type t){
+    	int opcode = -1;
+    	if(t.equals(Type.BYTE_TYPE) || t.equals(Type.BOOLEAN_TYPE) || t.equals(Type.CHAR_TYPE) 
+    			|| t.equals(Type.SHORT_TYPE) || t.equals(Type.INT_TYPE)){
+    		opcode = Opcodes.ILOAD;
+    	}else if(t.equals(Type.DOUBLE_TYPE)){
+    		opcode = Opcodes.DLOAD;
+    	}else if(t.equals(Type.FLOAT_TYPE)){
+    		opcode = Opcodes.FLOAD;
+    	}else if(t.equals(Type.LONG_TYPE)){
+    		opcode = Opcodes.LLOAD;
+    	}else{
+    		opcode = Opcodes.ALOAD; 
+    	}
+    	return opcode;
+    }
+    
+    protected void LoadOrStore(int index, String methodHandler, String arguments){
+        super.visitLdcInsn(index);
+        super.visitLdcInsn("var" + index);
+        super.visitLdcInsn(mCounter);
+        super.visitLdcInsn(mMethodSignature);
+        super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", methodHandler, arguments, false);
+        
+        saveLocalLocation(mCounter, mCounter - 5, "var" + index);
+
+    }
+    
     void saveLocalLocation(int loadOrStore, int push, String oldName)
     {
         m_localLocation[m_localLocationCount] = new LocalInfo();

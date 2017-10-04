@@ -28,7 +28,7 @@ public class Testing_2 {
 		
 		public Scheduler(){
 			Object result = element.execute();
-			System.out.println(result);
+	//		System.out.println(result);
 		}
 	}
 
@@ -38,6 +38,8 @@ public class Testing_2 {
 		Integer newInteger = myInteger.MAX_VALUE;
 		
 		int [] array_of_integers = {1, 2, 3, 4, 5};
+		char [] array = new char[3];
+		int  another_array[] = new int[3];
 		int x = 1;
 		double b = 10.5;
 		float c = 1.0f;
@@ -47,24 +49,28 @@ public class Testing_2 {
 		foo(x);
 		Testing_2 test = new Testing_2();
 		myscheduler = test.new Scheduler();
-		System.out.println(myscheduler.test_element);
-		System.out.println(myscheduler.element.toString());
-		System.out.println(myscheduler.someString);
+	//	System.out.println(myscheduler.test_element);
+	//	System.out.println(myscheduler.element.toString());
+	//	System.out.println(myscheduler.someString);
 	     
 	}
+
+	
 
 	public static String  foo(int x)
 	{   
 		String input1 = "abc";     
-		String input2 = "efg";     
-		String input3 = input1 + input2;
+		String input2 = "efg";
+		String input3 = "hij";
+		String input4 = input1 + input2;
 
-		if (x > 1) {
-			return input1;
-		}
-		else {
-			return input2;
-		}        
+//		if (x > 1) {
+//			return input1;
+//		}
+//		else {
+//			return input2;
+//		}
+		return input3;
 	}
 
 }

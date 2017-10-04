@@ -138,6 +138,7 @@ public class IFProfiler
 
     public static void handleInstanceMethodCall(Object instance, String calledMethodName, String calledMethodSignature, int numberOfParameters, int callInstruction, boolean bReturnsValue, String methodSignature)
     {
+    	System.out.println("Method call: " + calledMethodName + calledMethodSignature + " { instance: " + instance + " # of param " + numberOfParameters + " returns " + bReturnsValue + " method: " + methodSignature + "}");
     }
 
     public static void handleInstanceMethodReturn(Object instance,
