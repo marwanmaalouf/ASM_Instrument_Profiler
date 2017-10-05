@@ -14,7 +14,8 @@ public class Main {
     private static String OS = System.getProperty("os.name").toLowerCase();
 
     public static void main(String[] args) throws IOException {
-        if (args.length != 1) {
+        //args[0] = "\\..\\..\\Desktop\\ASM bytecode project\\out\\com\\asmproj\\Testing_2.class";
+    	if (args.length != 1) {
             System.out.println("Provide a path to the class file as argument");
             return;
         }

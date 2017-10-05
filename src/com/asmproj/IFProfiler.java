@@ -144,6 +144,8 @@ public class IFProfiler
     public static void handleInstanceMethodReturn(Object instance,
                                                   String calledClassName, String calledMethodName, String calledMethodSignature, int callInstruction, boolean bReturnsValue, String methodSignature)
     {
+    	System.out.println("Method return: " + calledMethodName + calledMethodSignature + " { instance: " + instance + " called @" + callInstruction + " returns void <" + bReturnsValue + ">" + "} in method: " + methodSignature);
+
     }
 
     public static void handleMainMethodEntry(String methodParam, int nLocals, int nParams)

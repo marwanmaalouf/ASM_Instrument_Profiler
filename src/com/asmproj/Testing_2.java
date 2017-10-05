@@ -30,6 +30,11 @@ public class Testing_2 {
 			Object result = element.execute();
 	//		System.out.println(result);
 		}
+		
+		public String virtualMethod(String a, String b){
+			test_element++;
+			return a;
+		}
 	}
 
 	private static Integer myInteger = new Integer(10);
@@ -49,6 +54,7 @@ public class Testing_2 {
 		foo(x);
 		Testing_2 test = new Testing_2();
 		myscheduler = test.new Scheduler();
+		myscheduler.virtualMethod("a", "b");
 	//	System.out.println(myscheduler.test_element);
 	//	System.out.println(myscheduler.element.toString());
 	//	System.out.println(myscheduler.someString);
@@ -59,11 +65,13 @@ public class Testing_2 {
 
 	public static String  foo(int x)
 	{   
-		String input1 = "abc";     
+		String input1 = "vabc";     
 		String input2 = "efg";
 		String input3 = "hij";
-		String input4 = input1 + input2;
-
+		//String input4 = input2 + input1;
+		String input5 = input1 + input2;
+		
+		System.out.println(input1);
 //		if (x > 1) {
 //			return input1;
 //		}
@@ -72,5 +80,23 @@ public class Testing_2 {
 //		}
 		return input3;
 	}
+//	public  static void main(String[] args){
+//		String s1 = "abc";
+//		String s2 = "def";
+//		String s3 = s2 + s1;
+//		System.out.println(s1);
+//		System.out.println(s2);
+//		System.out.println(s3);
+//		}
+	
+//	public String foo(int x){
+//		String s1 = "abc";
+//		String s2 = "def";
+//		String s3 = s1 + s2;
+//		System.out.println(s1);
+//		System.out.println(s2);
+//		System.out.println(s3);
+//		return s3;
+//	}
 
 }
