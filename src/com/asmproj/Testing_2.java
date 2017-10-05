@@ -43,6 +43,13 @@ public class Testing_2 {
 		Integer newInteger = myInteger.MAX_VALUE;
 		
 		int [] array_of_integers = {1, 2, 3, 4, 5};
+		double [] arr = new double[5];
+		arr[1] = 0.1;
+		
+		Integer somelist [] = new Integer[2];
+		somelist[0] = Integer.MAX_VALUE;
+		
+		
 		char [] array = new char[3];
 		int  another_array[] = new int[3];
 		int x = 1;

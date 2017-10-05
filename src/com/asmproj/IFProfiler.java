@@ -32,20 +32,22 @@ public class IFProfiler
     }
     public static void handleArrayElementDefLONG(Object array, int index, long value, int defInstruction, String methodSignature)
     {
-
+        System.out.println("Def: {method: " + methodSignature + " type: ARRAY_LONG" + " index: " + index + " value: " + value + "}");
     }
     public static void handleArrayElementDefFLOAT(Object array, int index, float value, int defInstruction, String methodSignature)
     {
+        System.out.println("Def: {method: " + methodSignature + " type: ARRAY_FLOAT" + " index: " + index + " value: " + value + "}");
 
     }
     public static void handleArrayElementDefDOUBLE(Object array, int index, double value, int defInstruction, String methodSignature)
     {
+        System.out.println("Def: {method: " + methodSignature + " type: ARRAY_DOUBLE" + " index: " + index + " value: " + value + "}");
 
     }
 
     public static void handleArrayElementObjectDef(Object array, int index, Object theObject, int defInstruction, String methodSignature)
     {
-
+        System.out.println("Def: {method: " + methodSignature + " type: ARRAY_Object" + " index: " + index + " value: " + theObject + "}");
     }
 
     public static void handleLocalVariableDefINT(int value, int variableIndex, String variableName, int defInstruction, String methodSignature)
