@@ -8,6 +8,9 @@ public class Testing {
         int z, v, w;
         foo();
 
+        int t[] = new int[3];
+        t[2] = 2;
+
         if (x > 2) { // 9
 
             if (y > x) { // 10
