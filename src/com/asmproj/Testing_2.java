@@ -28,7 +28,7 @@ public class Testing_2 {
 		
 		public Scheduler(){
 			Object result = element.execute();
-	//		System.out.println(result);
+			System.out.println(result);
 		}
 		
 		public String virtualMethod(String a, String b){
@@ -41,6 +41,29 @@ public class Testing_2 {
 	
 	public  static void main(String[] args){
 		Integer newInteger = myInteger.MAX_VALUE;
+//		int x = -1;
+//		
+//		if(x < 0 )
+//		{
+//			x = -5;
+//			if(x == 1){
+//				x = -3;
+//			}else{
+//				int h1 = x;
+//			}
+//			
+//		}
+//		else{
+//			x = 2;
+//		}
+//		
+//		int h = 0;
+//		try{
+//			h = Integer.valueOf("1").intValue();
+//		}catch(NumberFormatException e){
+//			h = -1;
+//		}
+		int z = -1;
 		
 		int [] array_of_integers = {1, 2, 3, 4, 5};
 		double [] arr = new double[5];
@@ -62,9 +85,9 @@ public class Testing_2 {
 		Testing_2 test = new Testing_2();
 		myscheduler = test.new Scheduler();
 		myscheduler.virtualMethod("a", "b");
-	//	System.out.println(myscheduler.test_element);
-	//	System.out.println(myscheduler.element.toString());
-	//	System.out.println(myscheduler.someString);
+		System.out.println(myscheduler.test_element);
+		System.out.println(myscheduler.element.toString());
+		System.out.println(myscheduler.someString);
 	     
 	}
 
@@ -75,17 +98,16 @@ public class Testing_2 {
 		String input1 = "vabc";     
 		String input2 = "efg";
 		String input3 = "hij";
-		//String input4 = input2 + input1;
+		String input4 = input2 + input1;
 		String input5 = input1 + input2;
 		
 		System.out.println(input1);
-//		if (x > 1) {
-//			return input1;
-//		}
-//		else {
-//			return input2;
-//		}
-		return input3;
+		if (x > 1) {
+			return input1;
+		}
+		else {
+			return input2;
+		}
 	}
 //	public  static void main(String[] args){
 //		String s1 = "abc";
