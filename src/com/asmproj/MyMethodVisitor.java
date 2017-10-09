@@ -18,7 +18,7 @@ public class MyMethodVisitor extends MethodVisitor {
 	protected final String mMethodName;
 	protected final String mMethodSignature;
 	protected final MethodNode mMethodNode;
-	//    protected final LocalVariablesSorter mLocalVariablesSorter;
+
 	protected final MyLocalVariableSorter mLocalVariablesSorter;
 
 	protected int mCounter = 0;// need to increment it at the end of each visit
@@ -152,13 +152,11 @@ public class MyMethodVisitor extends MethodVisitor {
 				int [] newVariableIndexes = new int[argumentTypes.length];
 				for(int i = 0; i < argumentTypes.length; i++){
 					newVariableIndexes[i] = mLocalVariablesSorter.createLocalVariable(argumentTypes[i]);
-					System.out.println("adding variable with index " + newVariableIndexes[i]);
 				}
 
 				// Create a local variable to save THIS
 				int instanceVariableIndex =
 						mLocalVariablesSorter.createLocalVariable(Type.getType(Object.class));
-				System.out.println("adding new variable with index " + instanceVariableIndex);
 
 				// Save the arguments if any
 				if(argumentTypes.length > 0){
