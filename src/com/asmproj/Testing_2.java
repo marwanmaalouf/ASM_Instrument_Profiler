@@ -3,11 +3,11 @@ package com.asmproj;
 import java.lang.reflect.Field;
 import java.util.Random;
 
-
-
 public class Testing_2 {
 
 	private static Scheduler myscheduler;
+	private static int testSI;
+	private int testI;
 
 	interface myInterface{
 		Object execute();
@@ -62,6 +62,9 @@ public class Testing_2 {
 		Testing_2 test = new Testing_2();
 		myscheduler = test.new Scheduler();
 		myscheduler.virtualMethod("a", "b");
+		
+		test.testI = 5;
+		test.testSI = 5;
 	//	System.out.println(myscheduler.test_element);
 	//	System.out.println(myscheduler.element.toString());
 	//	System.out.println(myscheduler.someString);
