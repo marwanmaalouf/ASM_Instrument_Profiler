@@ -297,8 +297,8 @@ public class MyMethodVisitor extends MethodVisitor {
 				}else if(fieldType.equals(Type.DOUBLE_TYPE)){
 					mCounter += 10;
 					
-					int valueTempIndex = mLocalVariablesSorter.newLocal(Type.DOUBLE_TYPE);
-					int objectTempIndex = mLocalVariablesSorter.newLocal(Type.getType( (new Object()).getClass() ));
+					int valueTempIndex = mLocalVariablesSorter.createLocalVariable(Type.DOUBLE_TYPE);
+					int objectTempIndex = mLocalVariablesSorter.createLocalVariable(Type.getType( (new Object()).getClass() ));
 				
 					super.visitVarInsn(Opcodes.DSTORE, valueTempIndex);
 					super.visitVarInsn(Opcodes.ASTORE, objectTempIndex);
@@ -324,8 +324,8 @@ public class MyMethodVisitor extends MethodVisitor {
 				}else if(fieldType.equals(Type.LONG_TYPE)){
 					mCounter += 10;
 					
-					int valueTempIndex = mLocalVariablesSorter.newLocal(Type.LONG_TYPE);
-					int objectTempIndex = mLocalVariablesSorter.newLocal(Type.getType( (new Object()).getClass() ));
+					int valueTempIndex = mLocalVariablesSorter.createLocalVariable(Type.LONG_TYPE);
+					int objectTempIndex = mLocalVariablesSorter.createLocalVariable(Type.getType( Object.class ));
 				
 					super.visitVarInsn(Opcodes.LSTORE, valueTempIndex);
 					super.visitVarInsn(Opcodes.ASTORE, objectTempIndex);

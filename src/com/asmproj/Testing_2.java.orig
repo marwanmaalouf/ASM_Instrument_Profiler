@@ -85,21 +85,19 @@ public class Testing_2 {
 		Testing_2 test = new Testing_2();
 		myscheduler = test.new Scheduler();
 		myscheduler.virtualMethod("a", "b");
-
-		myInteger = new Integer(5);
-		
+<<<<<<< HEAD
 		System.out.println(myscheduler.test_element);
 		System.out.println(myscheduler.element.toString());
 		System.out.println(myscheduler.someString);
+=======
 		
 		test.testI = 5;
-		array[0] = 'c';
 		test.testSI = 5;
-		System.out.println(array[0]);
-		System.out.println(myscheduler.test_element);
-		System.out.println(myscheduler.element.toString());
-		System.out.println(myscheduler.someString);
-			     
+	//	System.out.println(myscheduler.test_element);
+	//	System.out.println(myscheduler.element.toString());
+	//	System.out.println(myscheduler.someString);
+>>>>>>> f251dbe2c1bea2099f956f1bcbfb74a3725c132c
+	     
 	}
 
 	
@@ -120,5 +118,23 @@ public class Testing_2 {
 			return input2;
 		}
 	}
+//	public  static void main(String[] args){
+//		String s1 = "abc";
+//		String s2 = "def";
+//		String s3 = s2 + s1;
+//		System.out.println(s1);
+//		System.out.println(s2);
+//		System.out.println(s3);
+//		}
+	
+//	public String foo(int x){
+//		String s1 = "abc";
+//		String s2 = "def";
+//		String s3 = s1 + s2;
+//		System.out.println(s1);
+//		System.out.println(s2);
+//		System.out.println(s3);
+//		return s3;
+//	}
 
 }
