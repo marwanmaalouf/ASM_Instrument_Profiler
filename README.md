@@ -26,15 +26,15 @@ Use the bat files provided:
 This part will be used and updated to reflect what has been done/what is supported by the current version:
 
 	. Local variable Def-Use (primitive types and object instances)
-	. GETFIELD
-	. Array Element Def (int)
+	. GETFIELD, GETSTATIC
+	. Array Element Def
+	. INVOKEVIRTUAL, INVOKEINTERFACE
 
 ## TODOs:
 This part reflects the next steps to be addressed (@Elie please put the list you compiled here)
 	
-	. m_Signature is giving null
 	. PUTFIELD -- @Johnny
-	. Array Element Def-Use (primitive types and object instances) -- @Elie @Samir
+	. Array Element Use (primitive types and object instances) -- @Samir
 	. <Put the list here>
 	
 ## Useful Links

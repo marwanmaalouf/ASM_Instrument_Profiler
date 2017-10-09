@@ -80,37 +80,56 @@ public class IFProfiler
 
     public static void handleStaticFieldDefINT(int value, String defParam, int defInstruction, String methodSignature)
     {
-    	
-    }
+    	System.out.println("Def: {method: " + methodSignature + " type: INT" + " name: " + defParam.split("\\|")[1] + " value: " + value + "}");
+    
+	}
     public static void handleStaticFieldDefLONG(long value, String defParam, int defInstruction, String methodSignature)
     {
+		System.out.println("Def: {method: " + methodSignature + " type: LONG" + " name: " + defParam.split("\\|")[1] + " value: " + value + "}");
+
     }
     public static void handleStaticFieldDefFLOAT(float value, String defParam, int defInstruction, String methodSignature)
     {
+		System.out.println("Def: {method: " + methodSignature + " type: FLOAT" + " name: " + defParam.split("\\|")[1] + " value: " + value + "}");
+
     }
     public static void handleStaticFieldDefDOUBLE(double value, String defParam, int defInstruction, String methodSignature)
     {
+		System.out.println("Def: {method: " + methodSignature + " type: DOUBLE" + " name: " + defParam.split("\\|")[1] + " value: " + value + "}");
+
     }
 
     public static void handleStaticFieldObjectDef(Object theObject, String defParam, int defInstruction, String methodSignature)
     {
+		System.out.println("Def: {method: " + methodSignature + " type: " + theObject.getClass().getName()  + " name: " + defParam.split("\\|")[1] + " value: " + theObject + "}");
+
     }
 
     public static void handleInstanceFieldDefINT(Object instance, int value, String defParam, int defInstruction, String methodSignature)
     {
-    }
+		System.out.println("Def: {method: " + methodSignature + " type: INT" + " name: " + defParam.split("\\|")[1] + " value: " + value + "}");
+    
+	}
     public static void handleInstanceFieldDefLONG(Object instance, long value, String defParam, int defInstruction, String methodSignature)
     {
+		System.out.println("Def: {method: " + methodSignature + " type: LONG" + " name: " + defParam.split("\\|")[1] + " value: " + value + "}");
+
     }
     public static void handleInstanceFieldDefFLOAT(Object instance, float value, String defParam, int defInstruction, String methodSignature)
     {
+		System.out.println("Def: {method: " + methodSignature + " type: FLOAT" + " name: " + defParam.split("\\|")[1] + " value: " + value + "}");
+
     }
     public static void handleInstanceFieldDefDOUBLE(Object instance, double value, String defParam, int defInstruction, String methodSignature)
     {
+		System.out.println("Def: {method: " + methodSignature + " type: DOUBLE" + " name: " + defParam.split("\\|")[1] + " value: " + value + "}");
+
     }
 
     public static void handleInstanceFieldObjectDef(Object instance, Object theObject, String defParam, int defInstruction, String methodSignature)
     {
+		System.out.println("Def: {method: " + methodSignature + " type: " + theObject.getClass().getName()  + " name: " + defParam.split("\\|")[1] + " value: " + theObject + "}");
+
     }
 
     public static void handleInstanceFieldUseINT(Object instance, int value, String declaringClass, String fieldName, int useInstruction, String methodSignature)
