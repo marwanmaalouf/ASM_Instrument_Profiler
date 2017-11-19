@@ -1,14 +1,21 @@
 package com.asmproj;
 
+import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.TypePath;
 import org.objectweb.asm.commons.LocalVariablesSorter;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.MethodNode;
 
+import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.List;
 
 
 // TODO: we need to find a solution for mSignature. we need to map m_strMethodSignature to desc
@@ -18,7 +25,8 @@ public class MyMethodVisitor extends MethodVisitor {
 	protected final String mMethodName;
 	protected final String mMethodSignature;
 	protected final MethodNode mMethodNode;
-
+	protected final String mClassName;
+	
 	protected final MyLocalVariableSorter mLocalVariablesSorter;
 
 	protected int mCounter = 0;// need to increment it at the end of each visit
@@ -36,21 +44,34 @@ public class MyMethodVisitor extends MethodVisitor {
 	protected static Hashtable<String, Boolean> _instrument = new Hashtable();
 
 	protected String newLocalVariableName = null;
-
+	
+	
+	protected final List<Integer> leaders;
+	protected int labelCounter = 0;
+	protected int line = -1;
+	
 	public static int _nTotalStatements = 0;
 	public static int _nTotalProbes = 0;
 
-
-	public MyMethodVisitor(int api, MethodVisitor mv, int access, String name, String desc, String signature, String[] exceptions) {
+	public MyMethodVisitor(int api, MethodVisitor mv, int access, String name, String desc, String signature, String className, String[] exceptions) {
 		super(api, mv);
-		mMethodNode = new MethodNode(access, signature, signature, signature, exceptions);
+		mMethodNode = new MethodNode(access, name, desc, signature, exceptions);
 		mLocalVariablesSorter = new MyLocalVariableSorter(api, access, desc, mv);
 		mMethodName = name;
 		mMethodSignature = desc;
-
-		_instrument.put("Field", Boolean.TRUE);
-		_instrument.put("DefUse", Boolean.TRUE);
-		_instrument.put("MethodCall", Boolean.TRUE);
+		mClassName = className;
+		
+		leaders = (List<Integer>)BasicBlockGenerator._leadersPerMethod.get(mClassName +"/" + mMethodName + mMethodSignature); 
+		System.out.print(mClassName + "/" + mMethodName + mMethodSignature + "{ ");
+		for(int i = 0; i < leaders.size(); i++){
+			System.out.print(leaders.get(i) + " ");
+		}
+		System.out.println("}");
+		
+		_instrument.put("Field", Boolean.FALSE);
+		_instrument.put("DefUse", Boolean.FALSE);
+		_instrument.put("MethodCall", Boolean.FALSE);
+		_instrument.put("MethodCoverage", Boolean.TRUE);
 
 	}
 
@@ -60,12 +81,39 @@ public class MyMethodVisitor extends MethodVisitor {
 		super.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
 		super.visitLdcInsn("method: " + mMethodName + " " + mMethodSignature);
 		super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+		
+		// Handle method Entry
+		super.visitLdcInsn("TBD");
+		super.visitLdcInsn(-1);
+		super.visitLdcInsn(-1);
+		super.visitLdcInsn(mClassName);
+		super.visitLdcInsn(mMethodName);
+		super.visitLdcInsn(mMethodSignature);
+		if(mMethodName.equals("main")){
+			super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleMainMethodEntry", 
+					Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(String.class), Type.INT_TYPE, Type.INT_TYPE, Type.getType(String.class),
+							Type.getType(String.class), Type.getType(String.class)), false);
+		}else{
+			super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleMethodEntry", 
+					Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(String.class), Type.INT_TYPE, Type.INT_TYPE, Type.getType(String.class),
+							Type.getType(String.class), Type.getType(String.class)), false);
+		}
+		
 		m_localLocationCount = 0;
 		m_localLocation = new LocalInfo[100000];
 	}
 
 	@Override
+	public void visitEnd() {
+
+		super.visitEnd();
+	}
+	
+	
+	
+	@Override
 	public void visitVarInsn(int opcode, int var) {
+		checkForBasicBlock();
 		mLocalVariablesSorter.incrementLocalCounter(var);
 
 		if(_instrument.get("DefUse").booleanValue()){
@@ -131,8 +179,15 @@ public class MyMethodVisitor extends MethodVisitor {
 		mCounter++;
 	}
 
+	@Override
+	public void visitLabel(Label label) {
+		checkForBasicBlock();
+		super.visitLabel(label);
+	}
+	
 	@Override 
 	public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf){    	
+		checkForBasicBlock();
 		if(_instrument.get("MethodCall").booleanValue()){
 
 			if(opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE){
@@ -222,18 +277,21 @@ public class MyMethodVisitor extends MethodVisitor {
 
 	@Override
 	public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs){
+		checkForBasicBlock();
 		super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
 		mCounter++;
 	}
 
 	@Override
 	public void visitJumpInsn(int opcode, Label label){
+		checkForBasicBlock();
 		super.visitJumpInsn(opcode, label);
 		mCounter++;
 	}
 
 	@Override
 	public void visitLocalVariable(String name, String desc, String signature, Label start, Label end, int index){
+		checkForBasicBlock();
 		System.out.println("Local variable: " + name + " with index " + index + " " + desc);
 		super.visitLocalVariable(name, desc, signature, start, end, index);
 		mCounter++;
@@ -243,6 +301,7 @@ public class MyMethodVisitor extends MethodVisitor {
 
 	@Override
 	public void visitFieldInsn(int opcode, String owner, String name, String desc){        
+		checkForBasicBlock();
 		if(_instrument.get("Field").booleanValue()){
 
 			if(opcode == Opcodes.GETFIELD){
@@ -434,6 +493,40 @@ public class MyMethodVisitor extends MethodVisitor {
 
 	@Override
 	public void visitInsn(int opcode) {
+		checkForBasicBlock();
+		if(_instrument.get("MethodCoverage")){
+	       switch(opcode) {
+	          case Opcodes.IRETURN:
+	          case Opcodes.FRETURN:
+	          case Opcodes.ARETURN:
+	          case Opcodes.LRETURN:
+	          case Opcodes.DRETURN:
+	        	  super.visitLdcInsn(true);
+	        	  super.visitLdcInsn(mCounter);
+	        	  super.visitLdcInsn(mClassName);
+	        	  super.visitLdcInsn(mMethodName);
+	        	  super.visitLdcInsn(mMethodSignature);
+	        	  super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleMethodExit", 
+		  					Type.getMethodDescriptor(Type.VOID_TYPE, Type.BOOLEAN_TYPE, Type.INT_TYPE, Type.getType(String.class),
+		  							Type.getType(String.class), Type.getType(String.class)), false);
+	        	  break;
+	          case Opcodes.RETURN:
+	        	  super.visitLdcInsn(false);
+	        	  super.visitLdcInsn(mCounter);
+	        	  super.visitLdcInsn(mClassName);
+	        	  super.visitLdcInsn(mMethodName);
+	        	  super.visitLdcInsn(mMethodSignature);
+	        	  super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleMethodExit", 
+		  					Type.getMethodDescriptor(Type.VOID_TYPE, Type.BOOLEAN_TYPE, Type.INT_TYPE, Type.getType(String.class),
+		  							Type.getType(String.class), Type.getType(String.class)), false);
+	              break;
+	          default: // do nothing
+	        }
+		}
+		
+		
+		
+		
 		if(_instrument.get("DefUse").booleanValue()){
 			
 			 if (opcode == Opcodes.AASTORE) {
@@ -508,9 +601,93 @@ public class MyMethodVisitor extends MethodVisitor {
 		mCounter++;
 	}
 
+	@Override
+	public void visitFrame(int type, int nLocal, Object[] local, int nStack, Object[] stack) {
+		super.visitFrame(type, nLocal, local, nStack, stack);
+		checkForBasicBlock();
+
+	}
+	
+	@Override
+	public void visitIincInsn(int var, int increment) {
+		// TODO Auto-generated method stub
+		checkForBasicBlock();
+		super.visitIincInsn(var, increment);
+	}
+	
+	@Override
+	public void visitLdcInsn(Object cst) {
+		// TODO Auto-generated method stub
+		checkForBasicBlock();
+		super.visitLdcInsn(cst);
+	}
+	
+	@Override
+	public void visitIntInsn(int opcode, int operand) {
+		// TODO Auto-generated method stub
+		checkForBasicBlock();
+		super.visitIntInsn(opcode, operand);
+	}
+	
+	@Override
+	public void visitLineNumber(int line, Label start) {
+		super.visitLineNumber(line, start);
+		if(leaders.contains(line)){
+			this.line = line;
+			System.out.println("Basic block @line: " + line);
+		}
+	}
+	
+	@Override
+	public void visitLookupSwitchInsn(Label dflt, int[] keys, Label[] labels) {
+		// TODO Auto-generated method stub
+		checkForBasicBlock();
+		super.visitLookupSwitchInsn(dflt, keys, labels);
+	}
+	
+	
+	@Override
+	public void visitMultiANewArrayInsn(String desc, int dims) {
+		// TODO Auto-generated method stub
+		checkForBasicBlock();
+		super.visitMultiANewArrayInsn(desc, dims);
+	}
+
+	@Override
+	public void visitTableSwitchInsn(int min, int max, Label dflt, Label... labels) {
+		// TODO Auto-generated method stub
+		checkForBasicBlock();
+		super.visitTableSwitchInsn(min, max, dflt, labels);
+	}
+
+	@Override
+	public void visitTryCatchBlock(Label start, Label end, Label handler, String type) {
+		// TODO Auto-generated method stub
+		checkForBasicBlock();
+		super.visitTryCatchBlock(start, end, handler, type);
+	}
+	
 
 
-
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	// ############################SUPPORT FUNCTIONS##############################//
 	/**
 	 * Helper function, returns the XSTORE Opcode corresponding to the given type
 	 * @param t: Type of the object to be stored
@@ -591,5 +768,20 @@ public class MyMethodVisitor extends MethodVisitor {
                 Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(Object.class), Type.INT_TYPE, type, Type.INT_TYPE, Type.getType(String.class)),
                 false);
         super.visitVarInsn(loadOpCode, index);
+    }
+    
+    private void checkForBasicBlock(){
+		if(line != -1){
+			super.visitLdcInsn(mClassName);
+			super.visitLdcInsn(mMethodName);
+			super.visitLdcInsn(mMethodSignature);
+			super.visitLdcInsn(line);
+			super.visitLdcInsn(mCounter);
+			super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleBasicBlockEntry", 
+					Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(String.class),
+							Type.getType(String.class), Type.getType(String.class), Type.INT_TYPE, Type.INT_TYPE), false);
+//			System.out.println("found basic block at line " + line);
+			line = -1;
+		}
     }
 }

@@ -4,6 +4,8 @@ import org.objectweb.asm.*;
 
 public class MyClassVisitor extends ClassVisitor {
 
+	protected String cClassName;
+	
     public MyClassVisitor(int api) {
         super(api);
     }
@@ -15,7 +17,8 @@ public class MyClassVisitor extends ClassVisitor {
     @Override
     public void visit(int version, int access, String name,
                       String signature, String superName, String[] interfaces) {
-        System.out.println("Visiting class: " + name);
+        cClassName = name;
+    	System.out.println("Visiting class: " + name);
         System.out.println("Class Major Version: " + version);
         System.out.println("Super class: " + superName);
         super.visit(version, access, name, signature, superName, interfaces);
@@ -26,10 +29,9 @@ public class MyClassVisitor extends ClassVisitor {
      */
     @Override
     public MethodVisitor visitMethod(int access, final String name, String desc, String signature, String[] exceptions) {
-        System.out.println("Visiting method: " + name);
-        System.out.println("Visiting signature: " + signature);
+        System.out.println("Visiting method: " + name + desc);
         MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions);
-        return new MyMethodVisitor(api, mv, access, name, desc, signature, exceptions);
+        return new MyMethodVisitor(api, mv, access, name, desc, signature, cClassName, exceptions);
     }
 
     /**
