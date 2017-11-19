@@ -11,16 +11,15 @@ import java.util.Map;
 import java.util.Stack;
 
 /*
- * BUGS:
- * 1. <init> is getting called before main, what should we do about it?
- * 
+ * BUGS: 
  * 
  * 
  */
 /*
- * TODO: For BB pairs we need to change the pop stack
- * TODO: Have the cross function bb pair as a flag
  * TODO: Handle inner class functions: they get created as anotehr .class
+ * TODO: Handle throw
+ * TODO: Handle def-use
+ * TODO: Handle clinit
  */
 
 public class IFProfiler
@@ -29,10 +28,11 @@ public class IFProfiler
 	private static Hashtable<String, Integer> methodTokenizer;
 
 	// Control
-	private static boolean methodCoverage = false;
-	private static boolean methodPairCoverage = false;
+	private static boolean methodCoverage = true;
+	private static boolean methodPairCoverage = true;
 	private static boolean basicBlockCoverage = true;
 	private static boolean basicBlockPairCoverage = true;
+	private static boolean crossFunctionBasicBlockCoverage = true;
 
 	// Method Coverage
 	private static int methodCounter = 0;
@@ -40,19 +40,22 @@ public class IFProfiler
 	private static HashMap<Integer, Integer> methodMap;
 
 	// Method Pair Coverage
-	private static HashMap<String, Integer> basicBlockTokeniser;
 	private static Hashtable<Pair<Integer, Integer>, MethodPairDesignator> methodPairDesignatorMap;
 	private static Hashtable<Pair<Integer, Integer>, Integer> methodPairsMap;
 
 	//  Basic Block Coverage
 	private static int basicBlockCounter = 0;
 	private static Stack<BasicBlockDesignator> bbStack;
+	private static HashMap<String, Integer> basicBlockTokeniser;
 	private static Hashtable<Integer, BasicBlockDesignator> basicBlockDesignatorMap;
 	private static Hashtable<Integer, Integer> basicBlockMap;
 
+	// Basic Block Pair Coverage
+	private static Hashtable<Pair<Integer, Integer>, BasicBlockPairsDesignator> basicBlockPairsDesignatorMap;
+	private static Hashtable<Pair<Integer, Integer>, Integer> basicBlockPairsMap;
 
 	// Debugger
-	private static boolean debug = true;
+	private static boolean debug = false;
 	private static final String _DEBUGGER = "DEBUG LOG :\t";
 
 
@@ -269,11 +272,16 @@ public class IFProfiler
 			methodPairDesignatorMap = new Hashtable<Pair<Integer, Integer>, MethodPairDesignator>();
 		}
 
-		if(basicBlockCoverage){
+		if(basicBlockCoverage || basicBlockPairCoverage){
 			basicBlockTokeniser = new HashMap<String, Integer>();
 			bbStack = new Stack<BasicBlockDesignator>();
 			basicBlockDesignatorMap = new Hashtable<Integer, BasicBlockDesignator>();
 			basicBlockMap = new Hashtable<Integer, Integer>();
+			if(basicBlockPairCoverage){ 
+				basicBlockPairsDesignatorMap = new Hashtable<Pair<Integer, Integer>, BasicBlockPairsDesignator>();
+				basicBlockPairsMap = new Hashtable<Pair<Integer, Integer>, Integer>();
+				
+			}
 		}
 	}
 
@@ -355,7 +363,24 @@ public class IFProfiler
 				BasicBlockDesignator lastBlock = bbStack.pop();
 				BasicBlockDesignator callerBlock = bbStack.peek();
 
-				// add pair
+				if(crossFunctionBasicBlockCoverage){
+					Integer lastBlock_token = basicBlockTokeniser(lastBlock.toString());
+					Integer caller_token = basicBlockTokeniser(callerBlock.toString());
+					
+					Pair<Integer, Integer> pair = new Pair(lastBlock_token, caller_token);
+					BasicBlockPairsDesignator basicBlockPairsDesignator = new BasicBlockPairsDesignator(lastBlock, callerBlock);
+					addBasicBlockPairsDesignator(pair, basicBlockPairsDesignator);
+
+					if(basicBlockPairsMap.containsKey(pair)){
+						Integer count = (Integer) basicBlockPairsMap.get(pair);
+						count = new Integer(count.intValue() + 1);
+						basicBlockPairsMap.put(pair, count);
+						if(debug)System.out.println(_DEBUGGER + "Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: " + count);
+					}else{
+						basicBlockPairsMap.put(pair, new Integer(1));
+						if(debug)System.out.println(_DEBUGGER + "Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: 1");
+					}
+				}
 			}
 		}
 
@@ -388,14 +413,40 @@ public class IFProfiler
 			if(bbStack.size() == 0){
 				// First basic Block of a method
 			}else{
-				BasicBlockDesignator previousBlock = bbStack.pop();
+				BasicBlockDesignator caller = bbStack.pop();
+				boolean addPair = false;
+				if(crossFunctionBasicBlockCoverage){
+					addPair = true;
+				}else{
+					String callerIdentifier = caller.className + "." + caller.methodName + caller.methodSignature;
+					String currentIdentifier = className + "." + methodName + methodSignature;
+					addPair = callerIdentifier.equals(currentIdentifier);
+					
+				}
+				if(addPair){
+					Integer caller_token = basicBlockTokeniser(caller.toString());
+					Pair<Integer, Integer> pair = new Pair(caller_token, key);
+					BasicBlockPairsDesignator basicBlockPairsDesignator = new BasicBlockPairsDesignator(caller, bbd);
+					addBasicBlockPairsDesignator(pair, basicBlockPairsDesignator);
+
+					if(basicBlockPairsMap.containsKey(pair)){
+						Integer count = (Integer) basicBlockPairsMap.get(pair);
+						count = new Integer(count.intValue() + 1);
+						basicBlockPairsMap.put(pair, count);
+						if(debug)System.out.println(_DEBUGGER + "Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: " + count);
+					}else{
+						basicBlockPairsMap.put(pair, new Integer(1));
+						if(debug)System.out.println(_DEBUGGER + "Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: 1");
+					}
+				}
 			}
-
-
 
 			bbStack.push(bbd);
 		}
 	}
+
+
+
 
 	public static void handleStaticMethodCall(String calledmethodInfo, int numberOfParameters, int callInstruction, boolean bReturnsValue, String methodSignature)
 	{
@@ -544,6 +595,19 @@ public class IFProfiler
 				e.printStackTrace();
 			}
 		}
+		if(basicBlockPairCoverage){
+			try {
+				writer = new PrintWriter("basicBlockPairCoverage.txt", "UTF-8");
+				for (Pair<Integer, Integer> key: basicBlockPairsMap.keySet()) {
+					String pair = "(" + key.getFirst() + "," + key.getSecond() + ")";
+					writer.printf("%-10s %d", pair, basicBlockPairsMap.get(key));
+					writer.println();
+				}
+				writer.close();
+			} catch (FileNotFoundException | UnsupportedEncodingException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	//	private static void writeMaptoFile(Hashtable<K, T> table, String filename){
@@ -603,6 +667,14 @@ public class IFProfiler
 		if(!basicBlockDesignatorMap.containsKey(key)){
 			basicBlockDesignatorMap.put(key, value);
 		}
+	}
+	
+	private static void addBasicBlockPairsDesignator(Pair<Integer, Integer> key,
+			BasicBlockPairsDesignator value) {
+		if(!basicBlockPairsDesignatorMap.containsKey(key)){
+			basicBlockPairsDesignatorMap.put(key, value);
+		}
+		
 	}
 }
 
