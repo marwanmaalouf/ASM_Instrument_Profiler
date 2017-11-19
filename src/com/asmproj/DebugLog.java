@@ -19,9 +19,11 @@ class DebugLog{
 	protected static List<Message> messages = new ArrayList<>();
 	static void Log(String message, int priority){
 		messages.add(new Message(message, priority));
+		printLog();
 	}
 	static void Log(String message){
 		messages.add(new Message(message, 0));
+		printLog();
 	}
 	static void printLog(){
 		if(!Control._DEBUG){
@@ -31,9 +33,9 @@ class DebugLog{
 		try {
 			writer = new PrintWriter(_DEBUGGER + ".txt", "UTF-8");
 
-			writer.printf("%-100s%-30s", "MESSAGE", "PRIORITY");
+			writer.printf("%-10s%-300s\n", "PRIORITY", "MESSAGE");
 			for (Message m: messages) {
-				writer.printf("%-100s%-30d", m.message, m.priority);
+				writer.printf("%-10d%-300s", m.priority, m.message);
 				writer.println();
 			}
 			writer.close();

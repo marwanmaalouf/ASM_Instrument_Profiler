@@ -1,22 +1,18 @@
 package com.asmproj;
 
-import java.awt.Container;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.List;
-import java.util.Map;
 import java.util.Stack;
 
 /*
  * BUGS: 
- * 
+ * 1. Jar file bug
  * 
  */
 /*
- * TODO: Handle inner class functions: they get created as anotehr .class
  * TODO: Handle throw
  * TODO: Handle def-use
  * TODO: Handle clinit
@@ -27,12 +23,6 @@ public class IFProfiler
 	private static Stack<Designator> stack;
 	private static Hashtable<String, Integer> methodTokenizer;
 
-	// Control
-	private static boolean methodCoverage = true;
-	private static boolean methodPairCoverage = true;
-	private static boolean basicBlockCoverage = true;
-	private static boolean basicBlockPairCoverage = true;
-	private static boolean crossFunctionBasicBlockCoverage = true;
 
 	// Method Coverage
 	private static int methodCounter = 0;
@@ -55,8 +45,7 @@ public class IFProfiler
 	private static Hashtable<Pair<Integer, Integer>, Integer> basicBlockPairsMap;
 
 	// Debugger
-	private static boolean debug = false;
-	private static final String _DEBUGGER = "DEBUG LOG :\t";
+	private static final String _CLASS_INDENTIFIER_ = "com.asmproj.IFProfiler";
 
 
 
@@ -81,16 +70,17 @@ public class IFProfiler
 	public static void handleThrow(String className, String methodName, String desc)
 	{
 		if(methodName.charAt(0) == '<'){return;}
-		System.out.println(_DEBUGGER + "Exiting method " + className + "." + methodName + desc);
+		String message = "Exiting method " + className + "." + methodName + desc;
+		DebugLog.Log(_CLASS_INDENTIFIER_ + ".handleThrow(String className, String methodName, String desc): " + message, 0);
 
+		
 		MethodDesignator method = (MethodDesignator)stack.pop();
 		MethodDesignator methodDesignator = new MethodDesignator(className, methodName, desc);
-		if(debug){
-			if(!method.equals(methodDesignator)){
-				System.out.println(_DEBUGGER + "error in poping stack");
-				System.out.println("expecting: " + methodDesignator.toString());
-				System.out.println("received: " + method.toString());
-			}
+		
+		
+		if(!method.equals(methodDesignator)){
+			message = "Error in poping stack, expecting: " + methodDesignator.toString() + "received: " + method.toString();
+			DebugLog.Log(_CLASS_INDENTIFIER_ + ".handleThrow(String className, String methodName, String desc): " + message, 10);
 		}
 	}
 
@@ -250,7 +240,7 @@ public class IFProfiler
 		Integer token = tokenize(main.toString());
 
 
-		if(methodCoverage){
+		if(Control._METHOD_COVERAGE){
 			methodDesignatorMap = new Hashtable<Integer, MethodDesignator>();
 			methodMap = new HashMap<Integer, Integer>();
 
@@ -260,24 +250,27 @@ public class IFProfiler
 				Integer count = (Integer) methodMap.get(token);
 				count = new Integer(count.intValue() + 1);
 				methodMap.put(token, count);
-				if(debug)System.out.println(_DEBUGGER + "Entering method " + main.toString() + ", count: " + count);
-			}else{
+				DebugLog.Log(_CLASS_INDENTIFIER_ + ".handleMainMethodEntry(String methodParam, int nLocals, int nParams, String className, String methodName, String desc): "
+				+"Entering method " + main.toString() + ", count: " + count);
+			}
+			else{
 				methodMap.put(token, new Integer(1));
-				if(debug)System.out.println(_DEBUGGER + "Entering method " + main.toString() + ", count: " + 1);
+				DebugLog.Log(_CLASS_INDENTIFIER_ + ".handleMainMethodEntry(String methodParam, int nLocals, int nParams, String className, String methodName, String desc): "
+						+"Entering method " + main.toString() + ", count: 1");			
 			}
 		}
 
-		if(methodPairCoverage){
+		if(Control._METHOD_PAIR_COVERAGE){
 			methodPairsMap = new Hashtable<Pair<Integer, Integer>, Integer>();
 			methodPairDesignatorMap = new Hashtable<Pair<Integer, Integer>, MethodPairDesignator>();
 		}
 
-		if(basicBlockCoverage || basicBlockPairCoverage){
+		if(Control._BASICBLOCK_COVERAGE || Control._BASICBLOCK_PAIR_COVERAGE){
 			basicBlockTokeniser = new HashMap<String, Integer>();
 			bbStack = new Stack<BasicBlockDesignator>();
 			basicBlockDesignatorMap = new Hashtable<Integer, BasicBlockDesignator>();
 			basicBlockMap = new Hashtable<Integer, Integer>();
-			if(basicBlockPairCoverage){ 
+			if(Control._BASICBLOCK_PAIR_COVERAGE){ 
 				basicBlockPairsDesignatorMap = new Hashtable<Pair<Integer, Integer>, BasicBlockPairsDesignator>();
 				basicBlockPairsMap = new Hashtable<Pair<Integer, Integer>, Integer>();
 				
@@ -294,21 +287,23 @@ public class IFProfiler
 		Integer token = tokenize(methodDesignator.toString());
 
 
-		if(methodCoverage){
+		if(Control._METHOD_COVERAGE){
 			addMethodDesignator(methodDesignator);
 
 			if(methodMap.containsKey(token)){
 				Integer count = (Integer) methodMap.get(token);
 				count = new Integer(count.intValue() + 1);
 				methodMap.put(token, count);
-				if(debug)System.out.println(_DEBUGGER + "Entering method " + methodDesignator.toString() + ", count: " + count);
+				DebugLog.Log(_CLASS_INDENTIFIER_ + ".handleMethodEntry(String methodParam, int nLocals, int nParams, String className, String methodName, String desc): " 
+				+"Entering method " + methodDesignator.toString() + ", count: " + count);
 			}else{
 				methodMap.put(token, new Integer(1));
-				if(debug)System.out.println(_DEBUGGER + "Entering method " + methodDesignator.toString() + ", count: " + 1);
+				DebugLog.Log(_CLASS_INDENTIFIER_ + ".handleMethodEntry(String methodParam, int nLocals, int nParams, String className, String methodName, String desc): " 
+						+"Entering method " + methodDesignator.toString() + ", count: 1");			
 			}	
 		}
 
-		if(methodPairCoverage){
+		if(Control._METHOD_PAIR_COVERAGE){
 			MethodDesignator caller = (MethodDesignator)stack.peek();
 			MethodPairDesignator methodPairDesignator = new MethodPairDesignator(caller, methodDesignator);
 			Integer caller_token = tokenize(caller.toString());
@@ -321,14 +316,16 @@ public class IFProfiler
 				Integer count = (Integer) methodPairsMap.get(pair);
 				count = new Integer(count.intValue() + 1);
 				methodPairsMap.put(pair, count);
-				if(debug)System.out.println(_DEBUGGER + "Method pair " + methodPairDesignator.toString() + " executed with count: " + count);
+				DebugLog.Log(_CLASS_INDENTIFIER_ + ".handleMethodEntry(String methodParam, int nLocals, int nParams, String className, String methodName, String desc): " 
+				+ "Method pair " + methodPairDesignator.toString() + " executed with count: " + count);
 			}else{
 				methodPairsMap.put(pair, new Integer(1));
-				if(debug)System.out.println(_DEBUGGER + "Method pair " + methodPairDesignator.toString() + " executed with count: 1");
+				DebugLog.Log(_CLASS_INDENTIFIER_ + ".handleMethodEntry(String methodParam, int nLocals, int nParams, String className, String methodName, String desc): " 
+						+ "Method pair " + methodPairDesignator.toString() + " executed with count: 1");			
 			}
 		}
 
-		if(basicBlockCoverage){
+		if(Control._BASICBLOCK_COVERAGE){
 			if(bbStack.size() > 0){
 				BasicBlockDesignator caller = bbStack.peek();
 				bbStack.push(caller);
@@ -341,20 +338,18 @@ public class IFProfiler
 
 	public static void handleMethodExit(boolean bReturnsValue, int returnInstruction, String className, String methodName, String desc)
 	{
+		String message = _CLASS_INDENTIFIER_ + ".handleMethodExit(boolean bReturnsValue, int returnInstruction, String className, String methodName, String desc)";
 		if(methodName.equals("<clinit>")){return;}
-		if(debug)System.out.println(_DEBUGGER + "Exiting method " + className + "." + methodName + desc);
+		DebugLog.Log(message + ": " + "Exiting method " + className + "." + methodName + desc);
 
 		MethodDesignator method = (MethodDesignator)stack.pop();
 		MethodDesignator methodDesignator = new MethodDesignator(className, methodName, desc);
-		if(debug){
-			if(!method.equals(methodDesignator)){
-				System.out.println(_DEBUGGER + "error in poping stack");
-				System.out.println("expecting: " + methodDesignator.toString());
-				System.out.println("received: " + method.toString());
-			}
+
+		if(!method.equals(methodDesignator)){
+			DebugLog.Log(message + ": Error in poping stack, expecting: " + methodDesignator.toString() + "received: " + method.toString(), 10);
 		}
 
-		if(basicBlockCoverage){
+		if(Control._BASICBLOCK_COVERAGE){
 			if(methodName.equals("main")){
 				while(bbStack.size() > 0)
 					bbStack.pop();
@@ -363,7 +358,7 @@ public class IFProfiler
 				BasicBlockDesignator lastBlock = bbStack.pop();
 				BasicBlockDesignator callerBlock = bbStack.peek();
 
-				if(crossFunctionBasicBlockCoverage){
+				if(Control._BASICBLOCK_CROSSFUNCTION_COVERAGE){
 					Integer lastBlock_token = basicBlockTokeniser(lastBlock.toString());
 					Integer caller_token = basicBlockTokeniser(callerBlock.toString());
 					
@@ -375,10 +370,10 @@ public class IFProfiler
 						Integer count = (Integer) basicBlockPairsMap.get(pair);
 						count = new Integer(count.intValue() + 1);
 						basicBlockPairsMap.put(pair, count);
-						if(debug)System.out.println(_DEBUGGER + "Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: " + count);
+						DebugLog.Log(message + ": Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: " + count);
 					}else{
 						basicBlockPairsMap.put(pair, new Integer(1));
-						if(debug)System.out.println(_DEBUGGER + "Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: 1");
+						DebugLog.Log(message + ": Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: 1");
 					}
 				}
 			}
@@ -392,9 +387,10 @@ public class IFProfiler
 	}
 
 	public static void handleBasicBlockEntry(String className, String methodName, String methodSignature, int lineNumber, int instructionNumber){
+		String methodIdentifier = _CLASS_INDENTIFIER_ + ".handleBasicBlockEntry(String className, String methodName, String methodSignature, int lineNumber, int instructionNumber)";
 		if(methodName.equals("<clinit>")){return;}
 
-		if(basicBlockCoverage){
+		if(Control._BASICBLOCK_COVERAGE){
 			BasicBlockDesignator bbd = new BasicBlockDesignator(className, methodName, methodSignature, lineNumber, instructionNumber);
 			Integer key = basicBlockTokeniser(bbd.toString());
 			addBasicBlockDesignator(key, bbd);
@@ -403,10 +399,10 @@ public class IFProfiler
 				Integer count = (Integer) basicBlockMap.get(key);
 				count = new Integer(count.intValue() + 1);
 				basicBlockMap.put(key, count);
-				if(debug)System.out.println(_DEBUGGER + "Entering basic block " + bbd.toString() + ", count: " + count);
+				DebugLog.Log(methodIdentifier+ ": Entering basic block " + bbd.toString() + ", count: " + count);
 			}else{
 				basicBlockMap.put(key, new Integer(1));
-				if(debug)System.out.println(_DEBUGGER + "Entering basic block " + bbd.toString() + ", count: " + 1);
+				DebugLog.Log(methodIdentifier+ ": Entering basic block " + bbd.toString() + ", count: 1");
 			}
 
 
@@ -415,7 +411,7 @@ public class IFProfiler
 			}else{
 				BasicBlockDesignator caller = bbStack.pop();
 				boolean addPair = false;
-				if(crossFunctionBasicBlockCoverage){
+				if(Control._BASICBLOCK_CROSSFUNCTION_COVERAGE){
 					addPair = true;
 				}else{
 					String callerIdentifier = caller.className + "." + caller.methodName + caller.methodSignature;
@@ -433,10 +429,10 @@ public class IFProfiler
 						Integer count = (Integer) basicBlockPairsMap.get(pair);
 						count = new Integer(count.intValue() + 1);
 						basicBlockPairsMap.put(pair, count);
-						if(debug)System.out.println(_DEBUGGER + "Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: " + count);
+						DebugLog.Log(methodIdentifier + ": Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: " + count);
 					}else{
 						basicBlockPairsMap.put(pair, new Integer(1));
-						if(debug)System.out.println(_DEBUGGER + "Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: 1");
+						DebugLog.Log(methodIdentifier + ": Basic Block pair " + basicBlockPairsDesignator.toString() + " executed with count: 1");
 					}
 				}
 			}
@@ -546,7 +542,7 @@ public class IFProfiler
 			e.printStackTrace();
 		}
 
-		if(methodCoverage){
+		if(Control._METHOD_COVERAGE){
 			try {
 				writer = new PrintWriter("methodCoverage.txt", "UTF-8");
 				for (Integer key: methodMap.keySet()) {
@@ -558,7 +554,7 @@ public class IFProfiler
 				e.printStackTrace();
 			}
 		}
-		if(methodPairCoverage){
+		if(Control._METHOD_PAIR_COVERAGE){
 			try {
 				writer = new PrintWriter("methodPairCoverage.txt", "UTF-8");
 				for (Pair<Integer, Integer> key: methodPairsMap.keySet()) {
@@ -571,7 +567,7 @@ public class IFProfiler
 				e.printStackTrace();
 			}
 		}
-		if(basicBlockCoverage){
+		if(Control._BASICBLOCK_COVERAGE){
 			try {
 				writer = new PrintWriter("basicBlockTokenizer.txt", "UTF-8");
 				for (String key: basicBlockTokeniser.keySet()) {
@@ -595,7 +591,7 @@ public class IFProfiler
 				e.printStackTrace();
 			}
 		}
-		if(basicBlockPairCoverage){
+		if(Control._BASICBLOCK_PAIR_COVERAGE){
 			try {
 				writer = new PrintWriter("basicBlockPairCoverage.txt", "UTF-8");
 				for (Pair<Integer, Integer> key: basicBlockPairsMap.keySet()) {
@@ -631,7 +627,7 @@ public class IFProfiler
 		if(!methodTokenizer.containsKey(key)){
 			methodTokenizer.put(key, token);
 			methodCounter++;
-			if(debug)System.out.println("Tokenizing " + key + " with token " + (methodCounter -1));
+			DebugLog.Log(_CLASS_INDENTIFIER_ + ": Tokenizing " + key + " with token " + (methodCounter -1));
 		}else{
 			token = (Integer) methodTokenizer.get(key);
 		}
@@ -644,7 +640,7 @@ public class IFProfiler
 		if(!basicBlockTokeniser.containsKey(key)){
 			basicBlockTokeniser.put(key, token);
 			basicBlockCounter++;
-			if(debug)System.out.println("Tokenizing " + key + " with token " + (basicBlockCounter -1));
+			DebugLog.Log(_CLASS_INDENTIFIER_ + ": Tokenizing " + key + " with token " + (basicBlockCounter -1));
 		}else{
 			token = (Integer) basicBlockTokeniser.get(key);
 		}
