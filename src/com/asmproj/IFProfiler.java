@@ -21,11 +21,10 @@ import java.util.Stack;
 public class IFProfiler
 {
 	private static Stack<Designator> stack;
-	private static Hashtable<String, Integer> methodTokenizer;
-
-
+	private static Tokeneizer methodTokenizer;
+	private static Tokeneizer basicBlockTokeniser;
+	
 	// Method Coverage
-	private static int methodCounter = 0;
 	private static Hashtable<Integer, MethodDesignator> methodDesignatorMap;
 	private static HashMap<Integer, Integer> methodMap;
 
@@ -36,7 +35,7 @@ public class IFProfiler
 	//  Basic Block Coverage
 	private static int basicBlockCounter = 0;
 	private static Stack<BasicBlockDesignator> bbStack;
-	private static HashMap<String, Integer> basicBlockTokeniser;
+//	private static HashMap<String, Integer> basicBlockTokeniser;
 	private static Hashtable<Integer, BasicBlockDesignator> basicBlockDesignatorMap;
 	private static Hashtable<Integer, Integer> basicBlockMap;
 
@@ -231,13 +230,13 @@ public class IFProfiler
 	{
 		// Initialize
 		stack = new Stack();
-		methodTokenizer = new Hashtable<String, Integer>();
+		methodTokenizer = new Tokeneizer("Method_Tokenizer");
 
 
 		MethodDesignator main = new MethodDesignator(className, methodName, desc);
 		stack.push(main);
 
-		Integer token = tokenize(main.toString());
+		Integer token = methodTokenizer.tokenize(main.toString());
 
 
 		if(Control._METHOD_COVERAGE){
@@ -266,7 +265,7 @@ public class IFProfiler
 		}
 
 		if(Control._BASICBLOCK_COVERAGE || Control._BASICBLOCK_PAIR_COVERAGE){
-			basicBlockTokeniser = new HashMap<String, Integer>();
+			basicBlockTokeniser = new Tokeneizer("BasicBlock_Tokenizer");
 			bbStack = new Stack<BasicBlockDesignator>();
 			basicBlockDesignatorMap = new Hashtable<Integer, BasicBlockDesignator>();
 			basicBlockMap = new Hashtable<Integer, Integer>();
@@ -284,7 +283,7 @@ public class IFProfiler
 
 
 		MethodDesignator methodDesignator = new MethodDesignator(className, methodName, desc);
-		Integer token = tokenize(methodDesignator.toString());
+		Integer token = methodTokenizer.tokenize(methodDesignator.toString());
 
 
 		if(Control._METHOD_COVERAGE){
@@ -306,7 +305,7 @@ public class IFProfiler
 		if(Control._METHOD_PAIR_COVERAGE){
 			MethodDesignator caller = (MethodDesignator)stack.peek();
 			MethodPairDesignator methodPairDesignator = new MethodPairDesignator(caller, methodDesignator);
-			Integer caller_token = tokenize(caller.toString());
+			Integer caller_token = methodTokenizer.tokenize(caller.toString());
 			Pair<Integer, Integer> pair = new Pair(caller_token, token);
 
 			// Add methodPairDesignator
@@ -359,8 +358,8 @@ public class IFProfiler
 				BasicBlockDesignator callerBlock = bbStack.peek();
 
 				if(Control._BASICBLOCK_CROSSFUNCTION_COVERAGE){
-					Integer lastBlock_token = basicBlockTokeniser(lastBlock.toString());
-					Integer caller_token = basicBlockTokeniser(callerBlock.toString());
+					Integer lastBlock_token = basicBlockTokeniser.tokenize(lastBlock.toString());
+					Integer caller_token = basicBlockTokeniser.tokenize(callerBlock.toString());
 					
 					Pair<Integer, Integer> pair = new Pair(lastBlock_token, caller_token);
 					BasicBlockPairsDesignator basicBlockPairsDesignator = new BasicBlockPairsDesignator(lastBlock, callerBlock);
@@ -392,7 +391,7 @@ public class IFProfiler
 
 		if(Control._BASICBLOCK_COVERAGE){
 			BasicBlockDesignator bbd = new BasicBlockDesignator(className, methodName, methodSignature, lineNumber, instructionNumber);
-			Integer key = basicBlockTokeniser(bbd.toString());
+			Integer key = basicBlockTokeniser.tokenize(bbd.toString());
 			addBasicBlockDesignator(key, bbd);
 
 			if(basicBlockMap.containsKey(key)){
@@ -420,7 +419,7 @@ public class IFProfiler
 					
 				}
 				if(addPair){
-					Integer caller_token = basicBlockTokeniser(caller.toString());
+					Integer caller_token = basicBlockTokeniser.tokenize(caller.toString());
 					Pair<Integer, Integer> pair = new Pair(caller_token, key);
 					BasicBlockPairsDesignator basicBlockPairsDesignator = new BasicBlockPairsDesignator(caller, bbd);
 					addBasicBlockPairsDesignator(pair, basicBlockPairsDesignator);
@@ -528,19 +527,7 @@ public class IFProfiler
 
 	public static void generateProfile(){
 		PrintWriter writer;
-		try {
-			writer = new PrintWriter("methodTokenizer.txt", "UTF-8");
-
-
-			for (String key: methodTokenizer.keySet()) {
-				int token = methodTokenizer.get(key);
-				writer.printf("%-100s%-30d", key, token);
-				writer.println();
-			}
-			writer.close();
-		} catch (FileNotFoundException | UnsupportedEncodingException e) {
-			e.printStackTrace();
-		}
+		methodTokenizer.printToFile();
 
 		if(Control._METHOD_COVERAGE){
 			try {
@@ -568,16 +555,7 @@ public class IFProfiler
 			}
 		}
 		if(Control._BASICBLOCK_COVERAGE){
-			try {
-				writer = new PrintWriter("basicBlockTokenizer.txt", "UTF-8");
-				for (String key: basicBlockTokeniser.keySet()) {
-					writer.printf("%-100s %d", key, basicBlockTokeniser.get(key));
-					writer.println();
-				}
-				writer.close();
-			} catch (FileNotFoundException | UnsupportedEncodingException e) {
-				e.printStackTrace();
-			}
+			basicBlockTokeniser.printToFile();
 
 
 			try {
@@ -606,50 +584,10 @@ public class IFProfiler
 		}
 	}
 
-	//	private static void writeMaptoFile(Hashtable<K, T> table, String filename){
-	//		PrintWriter writer;
-	//		try {
-	//			writer = new PrintWriter(filename + ".txt", "UTF-8");
-	//			
-	//	    	
-	//	    	for (Object key: table.keySet()) {
-	//	    		writer.printf("%-100s%-30s", key, table.get(key));
-	//	    		writer.println();
-	//	    	}
-	//	    	writer.close();
-	//		} catch (FileNotFoundException | UnsupportedEncodingException e) {
-	//			e.printStackTrace();
-	//		}
-	//	}
-
-	private static Integer tokenize(String key){
-		Integer token = new Integer(methodCounter);
-		if(!methodTokenizer.containsKey(key)){
-			methodTokenizer.put(key, token);
-			methodCounter++;
-			DebugLog.Log(_CLASS_INDENTIFIER_ + ": Tokenizing " + key + " with token " + (methodCounter -1));
-		}else{
-			token = (Integer) methodTokenizer.get(key);
-		}
-		return token;
-	}
-
-
-	private static Integer basicBlockTokeniser(String key){
-		Integer token = new Integer(basicBlockCounter);
-		if(!basicBlockTokeniser.containsKey(key)){
-			basicBlockTokeniser.put(key, token);
-			basicBlockCounter++;
-			DebugLog.Log(_CLASS_INDENTIFIER_ + ": Tokenizing " + key + " with token " + (basicBlockCounter -1));
-		}else{
-			token = (Integer) basicBlockTokeniser.get(key);
-		}
-		return token;
-	}
 
 	private static void addMethodDesignator(MethodDesignator m){
-		if(!methodDesignatorMap.containsKey(methodTokenizer.get(m.toString()))){
-			methodDesignatorMap.put(methodTokenizer.get(m.toString()), m);
+		if(!methodDesignatorMap.containsKey(methodTokenizer.tokenize(m.toString()))){
+			methodDesignatorMap.put(methodTokenizer.tokenize(m.toString()), m);
 		}
 	}
 

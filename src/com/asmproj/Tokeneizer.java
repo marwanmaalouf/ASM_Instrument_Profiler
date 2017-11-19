@@ -2,11 +2,14 @@ package com.asmproj;
 
 import java.util.HashMap;
 
-final class Tokeneizer extends MLogger{
+final class Tokeneizer extends MLogger<String, Integer>{
 	private int counter;
+	
 	public Tokeneizer(String name) {
 		super.map = new HashMap<String, Integer>();
 		super._FILENAME = name + ".txt";
+		super._COLUMN_1 = "VALUE";
+		super._COLUMN_2 = "TOKEN";
 		counter = 0;
 	}
 	
