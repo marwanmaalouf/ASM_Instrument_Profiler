@@ -14,8 +14,9 @@ Use the bat files provided:
 
 ## Profiler:
 	. Method coverage
-	. Method Pair coverage
+	. Method pair coverage
 	. Basic block coverage
+	. Basic block pair coverage
 	
 ## Useful Links
 [Java Bytecode Instructions List](https://en.wikipedia.org/wiki/Java_bytecode_instruction_listings)
