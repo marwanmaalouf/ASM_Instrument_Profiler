@@ -87,7 +87,7 @@ public class BasicBlockGenerator {
 	public static Map<String, List<Integer>> _leadersPerMethod = new HashMap<String, List<Integer>>();
 	public static List<InstructionList> basicBlocks = new ArrayList<InstructionList>();
 	private static InstructionList temp = new InstructionList();
-	public static List<Integer> lineNumbers = new ArrayList<Integer>();
+	public static List<Integer> instructionNumber = new ArrayList<Integer>();
 	
 //	public static void buildMethodBasicBlocks(MethodNode methodNode, String className, String methodName){
 //		System.out.println("Building basic blocks of " + className + "." + methodName);
@@ -278,7 +278,7 @@ public class BasicBlockGenerator {
 		for(MethodNode m: (List<MethodNode>)methods){
 			buildMethodBasicBlockDesignators(m, classNode.name, m.name);
 			//			_leadersPerMethod.put(classNode.name + "/" + m.name + m.desc, basicBlockLeaders);
-			_leadersPerMethod.put(classNode.name + "/" + m.name + m.desc, lineNumbers);
+			_leadersPerMethod.put(classNode.name + "/" + m.name + m.desc, instructionNumber);
 		}     
 		
 		for(String key:_leadersPerMethod.keySet()){
@@ -333,6 +333,7 @@ public class BasicBlockGenerator {
 		boolean isLeader = true;
 		for(AbstractInsnNode insn: methodNode.instructions.toArray()){
 			String instructionName = insnToString(insn);// Must keep it to maintain order of the labels
+			System.out.print(instructionName);
 			if(isLeader){
 				isLeader = false;
 				Integer label = Integer.valueOf(instructionName.split(" L")[1].trim());
@@ -411,16 +412,17 @@ public class BasicBlockGenerator {
 		}
 		
 		
-		lineNumbers = new ArrayList<Integer>();
+		instructionNumber = new ArrayList<Integer>();
+		int count = 0;
 		for(AbstractInsnNode insn : methodNode.instructions.toArray()){
 			String instructionName = insnToString(insn);// Must keep it to maintain order of the labels	
 			if(insn instanceof LabelNode){
 				Integer label = Integer.valueOf(instructionName.split("L")[1].trim());
 				if(basicBlockLeaders.contains(label)){
-					LineNumberNode lineNode = (LineNumberNode) insn.getNext();
-					lineNumbers.add(lineNode.line);
+					instructionNumber.add(count);
 				}
 			}
+			count++;
 		}
 	}
 

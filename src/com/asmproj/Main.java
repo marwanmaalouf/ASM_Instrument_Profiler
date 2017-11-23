@@ -19,7 +19,7 @@ public class Main {
 
 	private static final String _JAR = ".jar";
 	private static final String _CLASS = ".class";
-	private static final String _INSTRUMENTED = "";
+	private static final String _INSTRUMENTED = "_instrumented";
 	private static String _directoryPath;
 
 	protected static void instrumentJarFile(String jarFile, String outputFileName){
@@ -27,6 +27,7 @@ public class Main {
 
 		JarFile jis;
 		try {
+			System.out.println(jarFile);
 			jis = new JarFile(jarFile);
 			JarOutputStream jos = new JarOutputStream(new FileOutputStream(outputFileName));
 			Enumeration<JarEntry> entries = jis.entries();
@@ -97,13 +98,13 @@ public class Main {
 			InputStream in = new FileInputStream(classFile);
 			ClassWriter classWriter = instrumentClassFile(in, classFile);
 			
+
 			final DataOutputStream dout = new DataOutputStream(new FileOutputStream(outputFileName));
 			dout.write(classWriter.toByteArray());
 		} catch (IOException e) {
 			System.out.println("Failed to instrument " + classFile);
 			e.printStackTrace();
-		}
-		
+		}	
 	}
 	
 	public static void main(String [] args){
@@ -112,19 +113,19 @@ public class Main {
 			return;
 		}
 		
-		_directoryPath = Paths.get("").toAbsolutePath().toString();
+		_directoryPath = Paths.get("").toAbsolutePath().toString() + "\\";
+		
 		for(int i = 0; i < args.length; i++){
 			String fileName = args[i];
 			String filePath = _directoryPath + fileName;
-			String outputFileName = "";
+			String outputFileName = _directoryPath + fileName;
 
 			System.out.println("File found: " + filePath);
 			
 			if(fileName.contains(_JAR)){
-				outputFileName = _directoryPath + fileName.split(_JAR)[0] + _INSTRUMENTED + _JAR;
+				outputFileName = outputFileName.split(_JAR)[0] + _INSTRUMENTED + _JAR;
 				instrumentJarFile(filePath, outputFileName);
 			}else if(fileName.contains(_CLASS)){
-				outputFileName = _directoryPath + fileName.split(_CLASS)[0] + _INSTRUMENTED + _CLASS;
 				instrumentClassFile(filePath, outputFileName);
 			}
 			

@@ -14,7 +14,7 @@ abstract class MLogger<K, V>{
 	public void printToFile(){
 		PrintWriter writer;
 		try {
-			writer = new PrintWriter(_FILENAME, "UTF-8");
+			writer = new PrintWriter("out\\" + _FILENAME, "UTF-8");
 			writer.printf("%-130s%-30s", _COLUMN_1, _COLUMN_2);
 			writer.println();
 

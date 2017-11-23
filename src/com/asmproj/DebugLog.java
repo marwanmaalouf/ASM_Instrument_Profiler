@@ -31,7 +31,7 @@ class DebugLog{
 		}
 		PrintWriter writer;
 		try {
-			writer = new PrintWriter(_DEBUGGER + ".txt", "UTF-8");
+			writer = new PrintWriter("out\\" + _DEBUGGER + ".txt", "UTF-8");
 
 			writer.printf("%-10s%-300s\n", "PRIORITY", "MESSAGE");
 			for (Message m: messages) {

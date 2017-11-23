@@ -8,13 +8,15 @@ import java.util.Hashtable;
 import java.util.Stack;
 
 /*
- * BUGS: 
- * 1. Jar file bug
+ * BUGS:
  * 
  */
+
 /*
+ * TODO: Add thread management
+ * TODO: create instrumented classes in another directory
  * TODO: Handle throw
- * TODO: Handle def-use
+ * TODO: Handle def-use (not keeping track of the value in this profiler)
  * TODO: Handle clinit
  */
 
@@ -280,12 +282,12 @@ public class IFProfiler
 	public static void handleMethodEntry(String methodParam, int nLocals, int nParams, String className, String methodName, String desc)
 	{
 		if(methodName.equals("<clinit>")){return;}
-
+		
+		
 
 		MethodDesignator methodDesignator = new MethodDesignator(className, methodName, desc);
 		Integer token = methodTokenizer.tokenize(methodDesignator.toString());
-
-
+				
 		if(Control._METHOD_COVERAGE){
 			addMethodDesignator(methodDesignator);
 
@@ -531,7 +533,7 @@ public class IFProfiler
 
 		if(Control._METHOD_COVERAGE){
 			try {
-				writer = new PrintWriter("methodCoverage.txt", "UTF-8");
+				writer = new PrintWriter("out\\" + "methodCoverage.txt", "UTF-8");
 				for (Integer key: methodMap.keySet()) {
 					writer.printf("%-10d %d", key, methodMap.get(key));
 					writer.println();
@@ -543,7 +545,7 @@ public class IFProfiler
 		}
 		if(Control._METHOD_PAIR_COVERAGE){
 			try {
-				writer = new PrintWriter("methodPairCoverage.txt", "UTF-8");
+				writer = new PrintWriter("out\\" + "methodPairCoverage.txt", "UTF-8");
 				for (Pair<Integer, Integer> key: methodPairsMap.keySet()) {
 					String pair = "(" + key.getFirst() + "," + key.getSecond() + ")";
 					writer.printf("%-10s %d", pair, methodPairsMap.get(key));
@@ -559,7 +561,7 @@ public class IFProfiler
 
 
 			try {
-				writer = new PrintWriter("basicBlockCoverage.txt", "UTF-8");
+				writer = new PrintWriter("out\\" + "basicBlockCoverage.txt", "UTF-8");
 				for (Integer key: basicBlockMap.keySet()) {
 					writer.printf("%-10s %d", key, basicBlockMap.get(key));
 					writer.println();
@@ -571,7 +573,7 @@ public class IFProfiler
 		}
 		if(Control._BASICBLOCK_PAIR_COVERAGE){
 			try {
-				writer = new PrintWriter("basicBlockPairCoverage.txt", "UTF-8");
+				writer = new PrintWriter("out\\" + "basicBlockPairCoverage.txt", "UTF-8");
 				for (Pair<Integer, Integer> key: basicBlockPairsMap.keySet()) {
 					String pair = "(" + key.getFirst() + "," + key.getSecond() + ")";
 					writer.printf("%-10s %d", pair, basicBlockPairsMap.get(key));

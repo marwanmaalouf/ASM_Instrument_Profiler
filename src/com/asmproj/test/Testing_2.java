@@ -27,8 +27,11 @@ public class Testing_2 {
 		String someString = "test passed !";
 		
 		public Scheduler(){
+			System.out.println("error here?");
 			Object result = element.execute();
+			System.out.println("error here?");
 			System.out.println(result);
+			System.out.println("error here?");
 		}
 		
 		public String virtualMethod(String a, String b){
@@ -79,7 +82,10 @@ public class Testing_2 {
 
 		foo(x);
 		Testing_2 test = new Testing_2();
+		
+		System.out.println("Error here");
 		myscheduler = test.new Scheduler();
+		System.out.println("not Error here");
 		myscheduler.virtualMethod("a", "b");
 		
 		myscheduler.virtualMethod("a", "b");

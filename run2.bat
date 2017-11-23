@@ -1,4 +1,2 @@
-cd out
-java -cp "../src/libs/*";"./" com.asmproj.Main \com\asmproj\test\Testing_2.class \com\asmproj\test\Testing_2$myclass.class \com\asmproj\test\Testing_2$myInterface.class \com\asmproj\test\Testing_2$Scheduler.class
-java com.asmproj.test.Testing_2
-cd ..
+java -cp "src/libs/*";"./out/" com.asmproj.Main out\com\asmproj\test\Testing_2.class out\com\asmproj\test\Testing_2$myclass.class out\com\asmproj\test\Testing_2$myInterface.class out\com\asmproj\test\Testing_2$Scheduler.class
+java -cp "./out" com.asmproj.test.Testing_2
