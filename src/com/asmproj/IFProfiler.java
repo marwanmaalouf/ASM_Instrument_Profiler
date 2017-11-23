@@ -112,6 +112,10 @@ public class IFProfiler
 	public static void handleLocalVariableDefINT(int value, int variableIndex, String variableName, int defInstruction, String methodSignature)
 	{
 		System.out.println("Def: {method: " + methodSignature + " type: INT" + " name: " + variableName + " value: " + value + "}");
+		
+
+		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodSignature), variableName, variableIndex, defInstruction);
+
 
 	}
 	public static void handleLocalVariableDefLONG(long value, int variableIndex, String variableName, int defInstruction, String methodSignature)

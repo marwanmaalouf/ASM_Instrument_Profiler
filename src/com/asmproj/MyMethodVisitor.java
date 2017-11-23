@@ -759,12 +759,12 @@ public class MyMethodVisitor extends MethodVisitor {
 		return opcode;
 	}
 
-	protected void LoadOrStore(int index, String methodHandler, String arguments){
+	protected void LoadOrStore(int index, String methodHandler, String methodSignature){
 		super.visitLdcInsn(index);
-		super.visitLdcInsn("var" + index);
-		super.visitLdcInsn(mCounter);
+		super.visitLdcInsn("var_" + index);
+		super.visitLdcInsn(count);
 		super.visitLdcInsn(mMethodIdentifier);
-		super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", methodHandler, arguments, false);
+		super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", methodHandler, methodSignature, false);
 
 		saveLocalLocation(mCounter, mCounter - 5, "var" + index);
 
