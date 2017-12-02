@@ -8,7 +8,6 @@ public class ArrayElementVariableDesignator extends VariableDesignator{
 	private final WeakReference _array;
 	private Object _object;
 	private final int variableIndex;
-	private final String _id;
 	private final MethodDesignator methodDesignator;
 	
 	
@@ -28,8 +27,8 @@ public class ArrayElementVariableDesignator extends VariableDesignator{
 		return variableIndex;
 	}
 
-	public String get_id() {
-		return _id;
+	public String getid() {
+		return id;
 	}
 
 	public MethodDesignator getMethodDesignator() {
@@ -42,7 +41,7 @@ public class ArrayElementVariableDesignator extends VariableDesignator{
 	}
 	
 	private String buildId(){
-		return "A" + variableIndex + ":" + _array.toString() + ":" + methodDesignator.className + "." + methodDesignator.methodName
+		return "A" + variableIndex + ":" + methodDesignator.className + "." + methodDesignator.methodName
 				+ methodDesignator.methodSignature;
 	}
 
@@ -53,7 +52,7 @@ public class ArrayElementVariableDesignator extends VariableDesignator{
 		 
 		 setObject(theObject);
 		 
-		 _id = buildId(); 
+		 id = buildId(); 
 	}
 	
 	public ArrayElementVariableDesignator(ArrayElementVariableDesignator aevd) {
@@ -63,7 +62,7 @@ public class ArrayElementVariableDesignator extends VariableDesignator{
 		 
 		 setObject(get_object());
 		 
-		 _id = buildId(); 
+		 id = buildId(); 
 	}
 
 
@@ -85,7 +84,7 @@ public class ArrayElementVariableDesignator extends VariableDesignator{
 	@Override
 	public String toString()
 	{
-		return _id;
+		return id;
 		//return "ArrayElement: index(" + _index + ")" + getObjectToString(_array.get()) + " : " + getObjectToString(getObject());// + "  T: " + getDefTime();
 	}
 }

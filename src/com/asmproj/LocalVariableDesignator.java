@@ -5,35 +5,31 @@ class LocalVariableDesignator extends VariableDesignator{
 	protected final MethodDesignator methodDesignator;
 	protected final int variableIndex;
 	protected final String variableName;
-	protected final int instruction;
-	private final String _id;
 	
 	private String builtID(){
 		return  "L" + variableIndex + ":" + variableName + ":" + methodDesignator.className + "." + methodDesignator.methodName
 				+ methodDesignator.methodSignature;
 	}
 	
-	public LocalVariableDesignator(MethodDesignator methodDesignator, String variableName, int variableIndex, int defInstruction){
+	public LocalVariableDesignator(MethodDesignator methodDesignator, String variableName, int variableIndex){
 		this.methodDesignator = new MethodDesignator(methodDesignator);
 		this.variableName = variableName;
 		this.variableIndex = variableIndex;
-		this.instruction = defInstruction;
 		
-		this._id = builtID();
+		this.id = builtID();
 	}
 	
 	public LocalVariableDesignator(LocalVariableDesignator localVariableDesignator){
 		this.methodDesignator = new MethodDesignator(localVariableDesignator.methodDesignator);
 		this.variableName = localVariableDesignator.variableName;
 		this.variableIndex = localVariableDesignator.variableIndex;
-		this.instruction = localVariableDesignator.instruction;
 
-		this._id = builtID();
+		this.id = builtID();
 	}	
 
 
 	public String getID(){
-		return _id;
+		return id;
 	}
 	
 	@Override
@@ -52,7 +48,7 @@ class LocalVariableDesignator extends VariableDesignator{
 	
 	@Override
 	public String toString() {
-		return _id + "| defined at insruction #" + instruction;
+		return id;
 	}
 	
 	

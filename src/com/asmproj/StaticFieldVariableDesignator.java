@@ -4,7 +4,6 @@ package com.asmproj;
 public class StaticFieldVariableDesignator extends VariableDesignator{
 	protected String _className;
 	protected String _fieldName;
-	protected String _id; 
 	
 	protected String buildId(){
 		return "S " + _className + "." + _fieldName;
@@ -13,20 +12,20 @@ public class StaticFieldVariableDesignator extends VariableDesignator{
 	public StaticFieldVariableDesignator(String className, String fieldName) {
 		_className = className;
 		_fieldName = fieldName;
-		_id = buildId();
+		id = buildId();
 	}
 	
 	public StaticFieldVariableDesignator(StaticFieldVariableDesignator staticFieldVariableDesignator){
 		_className = staticFieldVariableDesignator._className;
 		_fieldName = staticFieldVariableDesignator._fieldName;
 		
-		_id = buildId();
+		id = buildId();
 	}
 	
 	
 	public String getID()
 	{
-		return _id;
+		return id;
 	}
 
 	@Override
@@ -44,7 +43,7 @@ public class StaticFieldVariableDesignator extends VariableDesignator{
 	
 	@Override
 	public String toString() {
-		return _id;
+		return id;
 	}
 	public String getClassName() { return _className; }
 

@@ -1,0 +1,9 @@
+CALLER,CALLED,COUNT
+com/asmproj/test/Testing_2$Scheduler.<init>(Lcom/asmproj/test/Testing_2;)V,com/asmproj/test/Testing_2$myclass.execute()Ljava/lang/Object;,1
+com/asmproj/test/Testing_2.foo2()V,com/asmproj/test/Testing_2.foo(I)Ljava/lang/String;,1
+com/asmproj/test/Testing_2$Scheduler.<init>(Lcom/asmproj/test/Testing_2;)V,com/asmproj/test/Testing_2$myclass.<init>(Lcom/asmproj/test/Testing_2;)V,1
+com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,com/asmproj/test/Testing_2.foo2()V,1
+com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,com/asmproj/test/Testing_2$Scheduler.virtualMethod(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;,2
+com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,com/asmproj/test/Testing_2$Scheduler.<init>(Lcom/asmproj/test/Testing_2;)V,1
+com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,com/asmproj/test/Testing_2.<init>()V,1
+com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,com/asmproj/test/Testing_2.foo(I)Ljava/lang/String;,2

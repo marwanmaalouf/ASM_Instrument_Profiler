@@ -1,2 +1,4 @@
-java -cp "./src/libs/*";"./out/" com.asmproj.Main instrumented\Testing.jar
-java -cp "./out";"./instrumented/" -jar Testing_instrumented
+mkdir .\instrumented
+mkdir .\instrumented\jar
+java -cp .\src\libs\*;.\out\ com.asmproj.Main jar\Testing.jar
+java -cp .\instrumented\jar\Testing_instrumented.jar;.\out com.asmproj.test.Testing_2

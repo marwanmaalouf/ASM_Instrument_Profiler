@@ -7,7 +7,7 @@ final class Tokeneizer extends MLogger<String, Integer>{
 	
 	public Tokeneizer(String name) {
 		super.map = new HashMap<String, Integer>();
-		super._FILENAME = name + ".txt";
+		super._FILENAME = name + "_Tokenizer.txt";
 		super._COLUMN_1 = "VALUE";
 		super._COLUMN_2 = "TOKEN";
 		counter = 0;
@@ -23,5 +23,13 @@ final class Tokeneizer extends MLogger<String, Integer>{
 			token = (Integer) map.get(key);
 		}
 		return token;
+	}
+	
+	public int getToken(String key){
+		if(map.containsKey(key)){
+			return map.get(key);
+		}else{
+			return -1;
+		}
 	}
 }

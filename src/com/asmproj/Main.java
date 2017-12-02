@@ -114,7 +114,6 @@ public class Main {
 		}
 		
 		_directoryPath = Paths.get("").toAbsolutePath().toString() + "\\";
-		
 		for(int i = 0; i < args.length; i++){
 			String fileName = args[i];
 			String filePath = _directoryPath + fileName;
@@ -123,7 +122,9 @@ public class Main {
 			System.out.println("File found: " + filePath);
 			
 			if(fileName.contains(_JAR)){
-				outputFileName = outputFileName.split(_JAR)[0] + _INSTRUMENTED + _JAR;
+				fileName = fileName.split(_JAR)[0] + _INSTRUMENTED + _JAR;
+				outputFileName = _directoryPath + "instrumented\\" + fileName;
+				System.out.println(outputFileName);
 				instrumentJarFile(filePath, outputFileName);
 			}else if(fileName.contains(_CLASS)){
 				instrumentClassFile(filePath, outputFileName);

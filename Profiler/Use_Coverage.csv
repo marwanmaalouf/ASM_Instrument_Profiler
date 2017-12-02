@@ -1,0 +1,25 @@
+NAME,COUNT
+L1:var_1:com/asmproj/test/Testing_2$Scheduler.virtualMethod(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;,2
+L0:var_0:com/asmproj/test/Testing_2$Scheduler.virtualMethod(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;,2
+S com/asmproj/test/Testing_2.myscheduler,7
+L1:var_1:com/asmproj/test/Testing_2$myclass.execute()Ljava/lang/Object;,1
+F com/asmproj/test/Testing_2$Scheduler.someString,2
+F com/asmproj/test/Testing_2$Scheduler.test_element,3
+F com/asmproj/test/Testing_2$Scheduler.element,3
+L1:var_1:com/asmproj/test/Testing_2$myclass.<init>(Lcom/asmproj/test/Testing_2;)V,1
+L1:var_1:com/asmproj/test/Testing_2$Scheduler.<init>(Lcom/asmproj/test/Testing_2;)V,1
+L14:var_14:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,3
+L2:var_2:com/asmproj/test/Testing_2.foo(I)Ljava/lang/String;,8
+L1:var_1:com/asmproj/test/Testing_2.foo(I)Ljava/lang/String;,10
+L0:var_0:com/asmproj/test/Testing_2.foo(I)Ljava/lang/String;,3
+L9:var_9:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,1
+L7:var_7:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,2
+L6:var_6:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,1
+L5:var_5:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,24
+L4:var_4:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,13
+A4:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,2
+A3:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,2
+A2:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,3
+A1:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,2
+A0:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,3
+L1:var_1:com/asmproj/test/Testing_2.main([Ljava/lang/String;)V,4

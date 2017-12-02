@@ -6,12 +6,11 @@ public class InstanceFieldVariableDesignator extends VariableDesignator{
 	protected WeakReference _instance; 
 	protected String _fieldName;
 	protected String _className;
-	private String _id;
 	
 	public WeakReference get_instance() {
 		return _instance;
 	}
-	public void set_instance(WeakReference instance) {
+	public void set_instance(Object instance) {
 		this._instance = new WeakReference(instance);
 	}
 	public String get_fieldName() {
@@ -26,16 +25,16 @@ public class InstanceFieldVariableDesignator extends VariableDesignator{
 	public void set_className(String className) {
 		this._className = className;
 	}
-	public String get_id() {
-		return _id;
+	public String getID() {
+		return id;
 	}
 	
 	private void buildId(){
-		this._id =  "F " + _className + "." + _fieldName;
+		this.id =  "F " + _className + "." + _fieldName;
 	}
 	
 	public InstanceFieldVariableDesignator(Object instance, String fieldName, String className){
-		set_instance((WeakReference) instance);
+		set_instance(instance);
 		set_fieldName(fieldName);
 		set_className(className);
 		
@@ -52,7 +51,7 @@ public class InstanceFieldVariableDesignator extends VariableDesignator{
 	
 	@Override
 	public String toString() {
-		return _id;
+		return id;
 	}
 
 

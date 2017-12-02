@@ -1,6 +1,5 @@
 package com.asmproj.test;
 
-import java.lang.reflect.Field;
 import java.util.Random;
 
 public class Testing_2 {
@@ -27,11 +26,7 @@ public class Testing_2 {
 		String someString = "test passed !";
 		
 		public Scheduler(){
-			System.out.println("error here?");
 			Object result = element.execute();
-			System.out.println("error here?");
-			System.out.println(result);
-			System.out.println("error here?");
 		}
 		
 		public String virtualMethod(String a, String b){
@@ -65,8 +60,23 @@ public class Testing_2 {
 		int z = -1;
 		
 		int [] array_of_integers = {1, 2, 3, 4, 5};
+		for(int i = 0; i < 5; i++){
+			System.out.println(array_of_integers[i]);
+		}
+		
+		array_of_integers[0] = 3;
+		array_of_integers[3] = 1;
+		
+		
+		for(int i = 0; i < 5; i++){
+			System.out.println(array_of_integers[i]);
+		}
+		
 		double [] arr = new double[5];
 		arr[1] = 0.1;
+		arr[0] = array_of_integers[2];
+
+		
 		
 		Integer somelist [] = new Integer[2];
 		somelist[0] = Integer.MAX_VALUE;
@@ -83,11 +93,8 @@ public class Testing_2 {
 		foo(x);
 		Testing_2 test = new Testing_2();
 		
-		System.out.println("Error here");
 		myscheduler = test.new Scheduler();
-		System.out.println("not Error here");
-		myscheduler.virtualMethod("a", "b");
-		
+		myscheduler.virtualMethod("a", "b");		
 		myscheduler.virtualMethod("a", "b");
 		System.out.println(myscheduler.test_element);
 		System.out.println(myscheduler.element.toString());
@@ -97,7 +104,6 @@ public class Testing_2 {
 		array[0] = 'c';
 		test.testSI = 5;
 		System.out.println(array[0]);
-		System.out.println(myscheduler.test_element);
 		System.out.println(myscheduler.element.toString());
 		System.out.println(myscheduler.someString);
 		

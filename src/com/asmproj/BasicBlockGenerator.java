@@ -88,6 +88,7 @@ public class BasicBlockGenerator {
 	public static List<InstructionList> basicBlocks = new ArrayList<InstructionList>();
 	private static InstructionList temp = new InstructionList();
 	public static List<Integer> instructionNumber = new ArrayList<Integer>();
+	public static Map<String, Map> _localsPerMethod  = new HashMap<String, Map>();
 	
 //	public static void buildMethodBasicBlocks(MethodNode methodNode, String className, String methodName){
 //		System.out.println("Building basic blocks of " + className + "." + methodName);
@@ -264,6 +265,7 @@ public class BasicBlockGenerator {
 	public static void buildClassBasicBlockDesignators(ClassNode classNode){
 		_leadersPerMethod = new HashMap<String, List<Integer>>();
 		
+		
 		/**
 		 * Get List of methods in the class
 		 */
@@ -276,9 +278,19 @@ public class BasicBlockGenerator {
 		 */
 
 		for(MethodNode m: (List<MethodNode>)methods){
+			List<LocalVariableNode> locVariables = (List<LocalVariableNode>)m.localVariables;
+			Map<Integer, String> locals = new HashMap<Integer, String>();
+			
+			if(locVariables != null){
+				for(final LocalVariableNode local : locVariables) {
+					locals.put(local.index, local.name);
+	            }
+				
+			}
+			
+			
 			buildMethodBasicBlockDesignators(m, classNode.name, m.name);
-			//			_leadersPerMethod.put(classNode.name + "/" + m.name + m.desc, basicBlockLeaders);
-			_leadersPerMethod.put(classNode.name + "/" + m.name + m.desc, instructionNumber);
+			_leadersPerMethod.put(classNode.name + "." + m.name + m.desc, instructionNumber);
 		}     
 		
 		for(String key:_leadersPerMethod.keySet()){
