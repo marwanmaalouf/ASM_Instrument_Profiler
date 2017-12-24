@@ -6,21 +6,20 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Stack;
 import java.util.Vector;
 
-/*
- * BUGS:
- * 1. I think that we should add the instance in the equality when considering instance Field variables 
- */
+
 
 /*
+ * TODO: In the output of Basic Blocks add the instruction number of the block bcz we might have line conflict
+ * TODO: for the use without def add them with def: "UNKNOWN"
  * TODO: Add thread management
  * TODO: create instrumented classes in another directory
  * TODO: Handle throw
  * TODO: Handle clinit
- * TODO: check skiplist to handle uninthialized this
  * TODO: I should rewrite the entire Profiler more efficiently and using some standards and hierarchy:
  *  1. use a factory framework for all the tables
  *  2. use a factory framework for all the designators
@@ -45,6 +44,7 @@ public class IFProfiler
 	private static Tokeneizer methodTokenizer;
 	private static Tokeneizer basicBlockTokeniser;
 	private static Tokeneizer variableTokenizer;
+	private static int unkownToken;
 
 	// Method Coverage
 	private static Hashtable<Integer, MethodDesignator> methodDesignatorMap;
@@ -74,7 +74,10 @@ public class IFProfiler
 
 	// Def use pair coverage
 	private static Hashtable<Integer, Integer> lastDefInstructionMap;
+	private static Hashtable<Integer, Integer> lastDefLineMap;
 	private static Hashtable<Vector<Integer>, Integer> defUsePairsMap;
+	private static Hashtable<Vector<Integer>, Integer> unknownDefUseMap;
+	private static final String UNKNOWN_TAG = "UNKNOWN";
 
 	private static int parameterIndex = 0;
 	private static boolean isStatic = true;
@@ -119,87 +122,93 @@ public class IFProfiler
 		}
 	}
 
-	public static void handleArrayElementDefINT(Object array, int index, int value, int defInstruction, String methodSignature)
+	public static void handleArrayElementDefINT(Object array, int index, int value, int defInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Def: {method: " + methodSignature + " type: ARRAY_INT" + " index: " + index + " value: " + value + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		ArrayElementVariableDesignator arrayElementVariableDesignator = new ArrayElementVariableDesignator(array, new Integer(value), index, methodDesignatorMap.get(methodDesignatorKey));
-		addDefDesignator(arrayElementVariableDesignator, defInstruction);
+		addDefDesignator(arrayElementVariableDesignator, defInstruction, line);
 
 	}
-	public static void handleArrayElementDefLONG(Object array, int index, long value, int defInstruction, String methodSignature)
+	public static void handleArrayElementDefLONG(Object array, int index, long value, int defInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Def: {method: " + methodSignature + " type: ARRAY_LONG" + " index: " + index + " value: " + value + "}");
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		ArrayElementVariableDesignator arrayElementVariableDesignator = new ArrayElementVariableDesignator(array, new Long(value), index, methodDesignatorMap.get(methodDesignatorKey));
-		addDefDesignator(arrayElementVariableDesignator, defInstruction);
+		addDefDesignator(arrayElementVariableDesignator, defInstruction, line);
 	}
-	public static void handleArrayElementDefFLOAT(Object array, int index, float value, int defInstruction, String methodSignature)
+	public static void handleArrayElementDefFLOAT(Object array, int index, float value, int defInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Def: {method: " + methodSignature + " type: ARRAY_FLOAT" + " index: " + index + " value: " + value + "}");
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		ArrayElementVariableDesignator arrayElementVariableDesignator = new ArrayElementVariableDesignator(array, new Float(value), index, methodDesignatorMap.get(methodDesignatorKey));
-		addDefDesignator(arrayElementVariableDesignator, defInstruction);
+		addDefDesignator(arrayElementVariableDesignator, defInstruction, line);
 	}
-	public static void handleArrayElementDefDOUBLE(Object array, int index, double value, int defInstruction, String methodSignature)
+	public static void handleArrayElementDefDOUBLE(Object array, int index, double value, int defInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Def: {method: " + methodSignature + " type: ARRAY_DOUBLE" + " index: " + index + " value: " + value + "}");
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		ArrayElementVariableDesignator arrayElementVariableDesignator = new ArrayElementVariableDesignator(array, new Double(value), index, methodDesignatorMap.get(methodDesignatorKey));
-		addDefDesignator(arrayElementVariableDesignator, defInstruction);
+		addDefDesignator(arrayElementVariableDesignator, defInstruction, line);
 	}
 
-	public static void handleArrayElementObjectDef(Object array, int index, Object theObject, int defInstruction, String methodSignature)
+	public static void handleArrayElementObjectDef(Object array, int index, Object theObject, int defInstruction, 
+			int line, String methodSignature)
 	{
 		//System.out.println("Def: {method: " + methodSignature + " type: ARRAY_Object" + " index: " + index + " value: " + theObject + "}");
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		ArrayElementVariableDesignator arrayElementVariableDesignator = new ArrayElementVariableDesignator(array, theObject, index, methodDesignatorMap.get(methodDesignatorKey));
-		addDefDesignator(arrayElementVariableDesignator, defInstruction);
+		addDefDesignator(arrayElementVariableDesignator, defInstruction, line);
 	}
 
-	public static void handleLocalVariableDefINT(int value, int variableIndex, String variableName, int defInstruction, String methodSignature)
+	public static void handleLocalVariableDefINT(int value, int variableIndex, String variableName, int defInstruction, int line, 
+			String methodSignature)
 	{
 		//System.out.println("Def: {method: " + methodSignature + " type: INT" + " name: " + variableName + " value: " + value + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), variableName, variableIndex);
-		addDefDesignator(localVariableDesignator, defInstruction);
+		addDefDesignator(localVariableDesignator, defInstruction, line);
 
 	}
-	public static void handleLocalVariableDefLONG(long value, int variableIndex, String variableName, int defInstruction, String methodSignature)
+	public static void handleLocalVariableDefLONG(long value, int variableIndex, String variableName, int defInstruction, 
+			int line, String methodSignature)
 	{
 		//System.out.println("Def: {method: " + methodSignature + " type: LONG" + " name: " + variableName + " value: " + value + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), variableName, variableIndex);
-		addDefDesignator(localVariableDesignator, defInstruction);
+		addDefDesignator(localVariableDesignator, defInstruction, line);
 	}
-	public static void handleLocalVariableDefFLOAT(float value, int variableIndex, String variableName, int defInstruction, String methodSignature)
+	public static void handleLocalVariableDefFLOAT(float value, int variableIndex, String variableName, int defInstruction, 
+			int line, String methodSignature)
 	{
 		//System.out.println("Def: {method: " + methodSignature + " type: FLOAT" + " name: " + variableName + " value: " + value + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), variableName, variableIndex);
-		addDefDesignator(localVariableDesignator, defInstruction);
+		addDefDesignator(localVariableDesignator, defInstruction, line);
 	}
-	public static void handleLocalVariableDefDOUBLE(double value, int variableIndex, String variableName, int defInstruction, String methodSignature)
+	public static void handleLocalVariableDefDOUBLE(double value, int variableIndex, String variableName, int defInstruction, 
+			int line, String methodSignature)
 	{
 		//System.out.println("Def: {method: " + methodSignature + " type: DOUBLE" + " name: " + variableName + " value: " + value + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), variableName, variableIndex);
-		addDefDesignator(localVariableDesignator, defInstruction);
+		addDefDesignator(localVariableDesignator, defInstruction, line);
 	}
 
 
-	public static void handleLocalVariableObjectDef(Object theObject, int variableIndex, String variableName, int defInstruction, String methodSignature)
+	public static void handleLocalVariableObjectDef(Object theObject, int variableIndex, String variableName, int defInstruction, 
+			int line, String methodSignature)
 	{
 		//System.out.println("Def: {method: " + methodSignature + " type: " + theObject.getClass().getName()  + " name: " + variableName + " value: " + theObject + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), variableName, variableIndex);
-		addDefDesignator(localVariableDesignator, defInstruction);
+		addDefDesignator(localVariableDesignator, defInstruction, line);
 	}
 
 
@@ -209,108 +218,119 @@ public class IFProfiler
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), "var_" + parameterIndex, parameterIndex);
-		addDefDesignator(localVariableDesignator, defInstruction);
+		addDefDesignator(localVariableDesignator, defInstruction, -1);
 		parameterIndex++;
 	}
 
-	public static void handleStaticFieldDefINT(int value, String defParam, int defInstruction, String className)
+	public static void handleStaticFieldDefINT(int value, String defParam, int defInstruction, 
+			int line, String className)
 	{
 		//System.out.println("Static Field Def: {class: " + className + " type: INT" + " name: " + defParam + " value: " + value + "}");
 
 		StaticFieldVariableDesignator staticFieldVariableDesignator = new StaticFieldVariableDesignator(className, defParam);
-		addDefDesignator(staticFieldVariableDesignator, defInstruction);
+		addDefDesignator(staticFieldVariableDesignator, defInstruction, line);
 	}
-	public static void handleStaticFieldDefLONG(long value, String defParam, int defInstruction, String className)
+	public static void handleStaticFieldDefLONG(long value, String defParam, int defInstruction, int line, String className)
 	{
 		//System.out.println("Static Field Def: {method: " + className + " type: LONG" + " name: " + defParam + " value: " + value + "}");
 
 		StaticFieldVariableDesignator staticFieldVariableDesignator = new StaticFieldVariableDesignator(className, defParam);
-		addDefDesignator(staticFieldVariableDesignator, defInstruction);
+		addDefDesignator(staticFieldVariableDesignator, defInstruction, line);
 	}
-	public static void handleStaticFieldDefFLOAT(float value, String defParam, int defInstruction, String className)
+	public static void handleStaticFieldDefFLOAT(float value, String defParam, int defInstruction, int line, String className)
 	{
 		//System.out.println("Static Field Def: {method: " + className + " type: FLOAT" + " name: " + defParam + " value: " + value + "}");
 		StaticFieldVariableDesignator staticFieldVariableDesignator = new StaticFieldVariableDesignator(className, defParam);
-		addDefDesignator(staticFieldVariableDesignator, defInstruction);
+		addDefDesignator(staticFieldVariableDesignator, defInstruction, line);
 	}
-	public static void handleStaticFieldDefDOUBLE(double value, String defParam, int defInstruction, String className)
+	public static void handleStaticFieldDefDOUBLE(double value, String defParam, int defInstruction, int line, String className)
 	{
 		//System.out.println("Static Field Def: {method: " + className + " type: DOUBLE" + " name: " + defParam + " value: " + value + "}");
 		StaticFieldVariableDesignator staticFieldVariableDesignator = new StaticFieldVariableDesignator(className, defParam);
-		addDefDesignator(staticFieldVariableDesignator, defInstruction);
+		addDefDesignator(staticFieldVariableDesignator, defInstruction, line);
 	}
 
-	public static void handleStaticFieldObjectDef(Object theObject, String defParam, int defInstruction, String className)
+	public static void handleStaticFieldObjectDef(Object theObject, String defParam, int defInstruction, int line, String className)
 	{
 		//System.out.println("Static Field Def: {method: " + className + " type: " + theObject.getClass().getName()  + " name: " + defParam + " value: " + theObject + "}");
 		StaticFieldVariableDesignator staticFieldVariableDesignator = new StaticFieldVariableDesignator(className, defParam);
-		addDefDesignator(staticFieldVariableDesignator, defInstruction);
+		addDefDesignator(staticFieldVariableDesignator, defInstruction, line);
 	}
 
-	public static void handleInstanceFieldDefINT(Object instance, int value, String defParam, int defInstruction, String className)
+	public static void handleInstanceFieldDefINT(Object instance, int value, String defParam, int defInstruction, 
+			int line, String className)
 	{
 		//System.out.println("Field Def: {class: " + className + " type: INT" + " name: " + defParam + " value: " + value + "}");
 		InstanceFieldVariableDesignator instanceFieldVariableDesignator = new InstanceFieldVariableDesignator(instance, defParam, className);
-		addDefDesignator(instanceFieldVariableDesignator, defInstruction);
+		addDefDesignator(instanceFieldVariableDesignator, defInstruction, line);
 
 	}
-	public static void handleInstanceFieldDefLONG(Object instance, long value, String defParam, int defInstruction, String className)
+	public static void handleInstanceFieldDefLONG(Object instance, long value, String defParam, int defInstruction, 
+			int line, String className)
 	{
 		//System.out.println("Field Def: {class: " + className + " type: LONG" + " name: " + defParam + " value: " + value + "}");
 		InstanceFieldVariableDesignator instanceFieldVariableDesignator = new InstanceFieldVariableDesignator(instance, defParam, className);
-		addDefDesignator(instanceFieldVariableDesignator, defInstruction);
+		addDefDesignator(instanceFieldVariableDesignator, defInstruction, line);
 	}
-	public static void handleInstanceFieldDefFLOAT(Object instance, float value, String defParam, int defInstruction, String className)
+	public static void handleInstanceFieldDefFLOAT(Object instance, float value, String defParam, int defInstruction, 
+			int line, String className)
 	{
 		//System.out.println("Field Def: {class: " + className + " type: FLOAT" + " name: " + defParam + " value: " + value + "}");
 		InstanceFieldVariableDesignator instanceFieldVariableDesignator = new InstanceFieldVariableDesignator(instance, defParam, className);
-		addDefDesignator(instanceFieldVariableDesignator, defInstruction);
+		addDefDesignator(instanceFieldVariableDesignator, defInstruction, line);
 	}
-	public static void handleInstanceFieldDefDOUBLE(Object instance, double value, String defParam, int defInstruction, String className)
+	public static void handleInstanceFieldDefDOUBLE(Object instance, double value, String defParam, int defInstruction, 
+			int line, String className)
 	{
 		//System.out.println("Field Def: {class: " + className + " type: DOUBLE" + " name: " + defParam + " value: " + value + "}");
 		InstanceFieldVariableDesignator instanceFieldVariableDesignator = new InstanceFieldVariableDesignator(instance, defParam, className);
-		addDefDesignator(instanceFieldVariableDesignator, defInstruction);
+		addDefDesignator(instanceFieldVariableDesignator, defInstruction, line);
 	}
 
-	public static void handleInstanceFieldObjectDef(Object instance, Object theObject, String defParam, int defInstruction, String className)
+	public static void handleInstanceFieldObjectDef(Object instance, Object theObject, String defParam, int defInstruction, 
+			int line, String className)
 	{
 		//System.out.println("Field Def: {class: " + className + " type: " + theObject.getClass().getName()  + " name: " + defParam + " value: " + theObject + "}");
 		InstanceFieldVariableDesignator instanceFieldVariableDesignator = new InstanceFieldVariableDesignator(instance, defParam, className);
-		addDefDesignator(instanceFieldVariableDesignator, defInstruction);
+		addDefDesignator(instanceFieldVariableDesignator, defInstruction, line);
 	}
 
-	public static void handleInstanceFieldUseINT(Object instance, int value, String declaringClass, String fieldName, int useInstruction, String methodSignature)
+	public static void handleInstanceFieldUseINT(Object instance, int value, String declaringClass, String fieldName, int useInstruction, 
+			int line, String methodSignature)
 	{        
 		//System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
 		InstanceFieldVariableDesignator instanceFieldVariableDesignator = new InstanceFieldVariableDesignator(instance, fieldName, declaringClass);
-		addUseDesignator(instanceFieldVariableDesignator, useInstruction);
+		addUseDesignator(instanceFieldVariableDesignator, useInstruction, line);
 	}
-	public static void handleInstanceFieldUseLONG(Object instance, long value, String declaringClass, String fieldName, int useInstruction, String methodSignature)
+	public static void handleInstanceFieldUseLONG(Object instance, long value, String declaringClass, String fieldName, int useInstruction, 
+			int line, String methodSignature)
 	{        
 		//System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
 		InstanceFieldVariableDesignator instanceFieldVariableDesignator = new InstanceFieldVariableDesignator(instance, fieldName, declaringClass);
-		addUseDesignator(instanceFieldVariableDesignator, useInstruction);
+		addUseDesignator(instanceFieldVariableDesignator, useInstruction, line);
 	}
-	public static void handleInstanceFieldUseFLOAT(Object instance, float value, String declaringClass, String fieldName, int useInstruction, String methodSignature)
+	public static void handleInstanceFieldUseFLOAT(Object instance, float value, String declaringClass, String fieldName, int useInstruction, 
+			int line, String methodSignature)
 	{
 		//System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
 		InstanceFieldVariableDesignator instanceFieldVariableDesignator = new InstanceFieldVariableDesignator(instance, fieldName, declaringClass);
-		addUseDesignator(instanceFieldVariableDesignator, useInstruction);
+		addUseDesignator(instanceFieldVariableDesignator, useInstruction, line);
 
 	}
-	public static void handleInstanceFieldUseDOUBLE(Object instance, double value, String declaringClass, String fieldName, int useInstruction, String methodSignature)
+	public static void handleInstanceFieldUseDOUBLE(Object instance, double value, String declaringClass, String fieldName, int useInstruction, 
+			int line, String methodSignature)
 	{
 		//System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
 		InstanceFieldVariableDesignator instanceFieldVariableDesignator = new InstanceFieldVariableDesignator(instance, fieldName, declaringClass);
-		addUseDesignator(instanceFieldVariableDesignator, useInstruction);
+		addUseDesignator(instanceFieldVariableDesignator, useInstruction, line);
 
 	}
-	public static void handleInstanceFieldObjectUse(Object instance, Object theObject, String declaringClass, String fieldName, int useInstruction, String methodSignature)
+	public static void handleInstanceFieldObjectUse(Object instance, Object theObject, String declaringClass, String fieldName, int useInstruction, 
+			int line, String methodSignature)
 	{
 		//System.out.println("Field use: {name: " + fieldName + " class: " + declaringClass + " instance: " + instance + " value: " + theObject + " inst#: " + useInstruction + "}");
 		InstanceFieldVariableDesignator instanceFieldVariableDesignator = new InstanceFieldVariableDesignator(instance, fieldName, declaringClass);
-		addUseDesignator(instanceFieldVariableDesignator, useInstruction);
+		addUseDesignator(instanceFieldVariableDesignator, useInstruction, line);
 	}
 
 	public static void handleInstanceMethodCall(Object instance, String calledMethodName, String calledMethodSignature, int numberOfParameters, int callInstruction, boolean bReturnsValue, String methodSignature)
@@ -382,8 +402,10 @@ public class IFProfiler
 			useMap = new Hashtable<Integer, Integer>();
 
 			if(Control._DEFUSE_PAIR_COVERAGE){
-				lastDefInstructionMap = new Hashtable<Integer, Integer>() ;
+				lastDefInstructionMap = new Hashtable<Integer, Integer>();
+				lastDefLineMap = new Hashtable<Integer, Integer>();
 				defUsePairsMap = new Hashtable<Vector<Integer>, Integer>();
+				unknownDefUseMap = new Hashtable<>();
 			}
 		}
 	}
@@ -576,116 +598,116 @@ public class IFProfiler
 
 
 
-	public static void handleArrayElementObjectUse(Object array, int index, Object theObject, int useInstruction, String methodSignature)
+	public static void handleArrayElementObjectUse(Object array, int index, Object theObject, int useInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Array element use of type " + theObject.getClass().getName() + " in " + methodSignature + " @ instruction #" + useInstruction);
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		ArrayElementVariableDesignator arrayElementVariableDesignator = new ArrayElementVariableDesignator(array, theObject, index, methodDesignatorMap.get(methodDesignatorKey));
-		addUseDesignator(arrayElementVariableDesignator, useInstruction);
+		addUseDesignator(arrayElementVariableDesignator, useInstruction, line);
 	}
-	public static void handleArrayElementUseINT(Object array, int index, int value, int useInstruction, String methodSignature)
+	public static void handleArrayElementUseINT(Object array, int index, int value, int useInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Array element use of type INT in " + methodSignature + " @ instruction #" + useInstruction);
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		ArrayElementVariableDesignator arrayElementVariableDesignator = new ArrayElementVariableDesignator(array, new Integer(value), index, methodDesignatorMap.get(methodDesignatorKey));
-		addUseDesignator(arrayElementVariableDesignator, useInstruction);
+		addUseDesignator(arrayElementVariableDesignator, useInstruction, line);
 	}
-	public static void handleArrayElementUseFLOAT(Object array, int index, float value, int useInstruction, String methodSignature)
+	public static void handleArrayElementUseFLOAT(Object array, int index, float value, int useInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Array element use of type FLOAT in " + methodSignature + " @ instruction #" + useInstruction);
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		ArrayElementVariableDesignator arrayElementVariableDesignator = new ArrayElementVariableDesignator(array, new Float(value), index, methodDesignatorMap.get(methodDesignatorKey));
-		addUseDesignator(arrayElementVariableDesignator, useInstruction);
+		addUseDesignator(arrayElementVariableDesignator, useInstruction, line);
 	}
-	public static void handleArrayElementUseLONG(Object array, int index, long value, int useInstruction, String methodSignature)
+	public static void handleArrayElementUseLONG(Object array, int index, long value, int useInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Array element use of type LONG in " + methodSignature + " @ instruction #" + useInstruction);
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		ArrayElementVariableDesignator arrayElementVariableDesignator = new ArrayElementVariableDesignator(array, new Long(value), index, methodDesignatorMap.get(methodDesignatorKey));
-		addUseDesignator(arrayElementVariableDesignator, useInstruction);
+		addUseDesignator(arrayElementVariableDesignator, useInstruction, line);
 	}
-	public static void handleArrayElementUseDOUBLE(Object array, int index, double value, int useInstruction, String methodSignature)
+	public static void handleArrayElementUseDOUBLE(Object array, int index, double value, int useInstruction,int line,  String methodSignature)
 	{
 		//System.out.println("Array element use of type DOUBLE in " + methodSignature + " @ instruction #" + useInstruction);
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		ArrayElementVariableDesignator arrayElementVariableDesignator = new ArrayElementVariableDesignator(array, new Double(value), index, methodDesignatorMap.get(methodDesignatorKey));
-		addUseDesignator(arrayElementVariableDesignator, useInstruction);
+		addUseDesignator(arrayElementVariableDesignator, useInstruction, line);
 	}
 
-	public static void handleLocalVariableUseI(int value, int variableIndex, String variableName, int useInstruction, String methodSignature)
+	public static void handleLocalVariableUseI(int value, int variableIndex, String variableName, int useInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Use: {method: " + methodSignature + " type: INT" + " name: " + variableName + " value: " + value + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), variableName, variableIndex);
-		addUseDesignator(localVariableDesignator, useInstruction);
+		addUseDesignator(localVariableDesignator, useInstruction, line);
 	}
-	public static void handleLocalVariableUseL(long value, int variableIndex, String variableName, int useInstruction, String methodSignature)
+	public static void handleLocalVariableUseL(long value, int variableIndex, String variableName, int useInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Use: {method: " + methodSignature + " type: " + "LONG" + " name: " + variableName + " value: " + value + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), variableName, variableIndex);
-		addUseDesignator(localVariableDesignator, useInstruction);
+		addUseDesignator(localVariableDesignator, useInstruction, line);
 	}
-	public static void handleLocalVariableUseF(float value, int variableIndex, String variableName, int useInstruction, String methodSignature)
+	public static void handleLocalVariableUseF(float value, int variableIndex, String variableName, int useInstruction,int line,  String methodSignature)
 	{
 		//System.out.println("Use: {method: " + methodSignature + " type: " + "FLOAT" + " name: " + variableName + " value: " + value + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), variableName, variableIndex);
-		addUseDesignator(localVariableDesignator, useInstruction);
+		addUseDesignator(localVariableDesignator, useInstruction, line);
 	}
-	public static void handleLocalVariableUseD(double value, int variableIndex, String variableName, int useInstruction, String methodSignature)
+	public static void handleLocalVariableUseD(double value, int variableIndex, String variableName, int useInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Use: {method: " + methodSignature + " type: " + "DOUBLE" + " name: " + variableName + " value: " + value + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), variableName, variableIndex);
-		addUseDesignator(localVariableDesignator, useInstruction);
+		addUseDesignator(localVariableDesignator, useInstruction, line);
 
 	}
-	public static void handleLocalVariableObjectUse(Object theObject, int variableIndex, String variableName, int useInstruction, String methodSignature)
+	public static void handleLocalVariableObjectUse(Object theObject, int variableIndex, String variableName, int useInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Use: {method: " + methodSignature + " type: " + theObject.getClass().getName() + " name: " + variableName + " value: " + theObject + "}");
 
 		int methodDesignatorKey = methodTokenizer.getToken(methodSignature);		
 		LocalVariableDesignator localVariableDesignator = new LocalVariableDesignator(methodDesignatorMap.get(methodDesignatorKey), variableName, variableIndex);
-		addUseDesignator(localVariableDesignator, useInstruction);
+		addUseDesignator(localVariableDesignator, useInstruction, line);
 	}
-	public static void handleIINC(int value, int variableIndex, String variableName, int incInstruction, String methodSignature)
+	public static void handleIINC(int value, int variableIndex, String variableName, int incInstruction,int line,  String methodSignature)
 	{
 	}
 
-	public static void handleStaticFieldUseINT(int value, String className, String fieldName, int useInstruction, String methodSignature)
+	public static void handleStaticFieldUseINT(int value, String className, String fieldName, int useInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Static Field use: {name: " + fieldName + " class: " + className + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
 		StaticFieldVariableDesignator staticFieldVariableDesignator = new StaticFieldVariableDesignator(className, fieldName);
-		addUseDesignator(staticFieldVariableDesignator, useInstruction);
+		addUseDesignator(staticFieldVariableDesignator, useInstruction, line);
 	}
-	public static void handleStaticFieldUseLONG(long value, String className, String fieldName, int useInstruction, String methodSignature)
+	public static void handleStaticFieldUseLONG(long value, String className, String fieldName, int useInstruction, int line, String methodSignature)
 	{
 		//System.out.println("Static Field use: {name: " + fieldName + " class: " + className + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
 		StaticFieldVariableDesignator staticFieldVariableDesignator = new StaticFieldVariableDesignator(className, fieldName);
-		addUseDesignator(staticFieldVariableDesignator, useInstruction);
+		addUseDesignator(staticFieldVariableDesignator, useInstruction, line);
 	}
-	public static void handleStaticFieldUseFLOAT(float value, String className, String fieldName, int useInstruction, String methodSignature)
+	public static void handleStaticFieldUseFLOAT(float value, String className, String fieldName, int useInstruction,int line,  String methodSignature)
 	{
 		//System.out.println("Static Field use: {name: " + fieldName + " class: " + className + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
 		StaticFieldVariableDesignator staticFieldVariableDesignator = new StaticFieldVariableDesignator(className, fieldName);
-		addUseDesignator(staticFieldVariableDesignator, useInstruction);
+		addUseDesignator(staticFieldVariableDesignator, useInstruction, line);
 	}
-	public static void handleStaticFieldUseDOUBLE(double value, String className, String fieldName, int useInstruction, String methodSignature)
+	public static void handleStaticFieldUseDOUBLE(double value, String className, String fieldName, int useInstruction,int line,  String methodSignature)
 	{
 		//System.out.println("Static Field use: {name: " + fieldName + " class: " + className + " value: " + value + " method: " + methodSignature + " inst#: " + useInstruction + "}");
 		StaticFieldVariableDesignator staticFieldVariableDesignator = new StaticFieldVariableDesignator(className, fieldName);
-		addUseDesignator(staticFieldVariableDesignator, useInstruction);
+		addUseDesignator(staticFieldVariableDesignator, useInstruction, line);
 	}
-	public static void handleStaticFieldObjectUse(Object theObject, String className, String fieldName, int useInstruction, String methodSignature)
+	public static void handleStaticFieldObjectUse(Object theObject, String className, String fieldName, int useInstruction,int line,  String methodSignature)
 	{
 		//System.out.println("Static Field use: {name: " + fieldName + " class: " + className + " value: " + theObject + " method: " + methodSignature + " inst#: " + useInstruction + "}");
 		StaticFieldVariableDesignator staticFieldVariableDesignator = new StaticFieldVariableDesignator(className, fieldName);
-		addUseDesignator(staticFieldVariableDesignator, useInstruction);
+		addUseDesignator(staticFieldVariableDesignator, useInstruction, line);
 	}
 
 
@@ -710,7 +732,7 @@ public class IFProfiler
 			writePairToCSV(_BASICBLOCKS_PAIR_COVERAGE, basicBlockPairsMap, basicBlockDesignatorMap);
 		}
 		if(Control._DEFUSE_COVERAGE){
-			variableTokenizer.printToFile();
+			//variableTokenizer.printToFile();
 			writeToCSV(_DEF_COVERAGE, defMap, variableDesignatorMap);
 			writeToCSV(_USE_COVERAGE, useMap, variableDesignatorMap);
 //
@@ -771,7 +793,7 @@ public class IFProfiler
 	}
 
 
-	private static void addDefDesignator(VariableDesignator variableDesignator, int instruction){
+	private static void addDefDesignator(VariableDesignator variableDesignator, int instruction, int line){
 		int token = variableTokenizer.tokenize(variableDesignator.id);
 		if(!variableDesignatorMap.containsKey(token)){
 			variableDesignatorMap.put(token, variableDesignator);
@@ -791,21 +813,19 @@ public class IFProfiler
 
 		if(Control._DEFUSE_PAIR_COVERAGE){
 			lastDefInstructionMap.put(token, instruction);
+			lastDefLineMap.put(token, line);
 		}
 
 
 	}
 
-	private static void addUseDesignator(VariableDesignator variableDesignator, int instruction){
+	private static void addUseDesignator(VariableDesignator variableDesignator, int instruction, int line){
 		int token = variableTokenizer.tokenize(variableDesignator.id);
 
 		if(!variableDesignatorMap.containsKey(token)){
-			System.out.println("###################################################");
-			System.out.println("WARNING: Use not defined: " + variableDesignator.id);
-			System.out.println("###################################################");
-			return;
+			variableDesignatorMap.put(token, variableDesignator);
 		}
-		
+
 		if(useMap.containsKey(token)){
 			Integer count = (Integer) useMap.get(token);
 			count = new Integer(count.intValue() + 1);
@@ -820,13 +840,32 @@ public class IFProfiler
 
 		if(Control._DEFUSE_PAIR_COVERAGE){
 			if(!lastDefInstructionMap.containsKey(token)){
+				Vector<Integer> duPair = new Vector<Integer>();
+				duPair.add(token);
+				duPair.add(instruction);
+				duPair.add(line);
+
+				if(unknownDefUseMap.containsKey(duPair)){
+					Integer count = (Integer) unknownDefUseMap.get(duPair);
+					count = new Integer(count.intValue() + 1);
+					unknownDefUseMap.put(duPair, count);
+					DebugLog.Log(_CLASS_INDENTIFIER_ + ".addUseDesignator(VariableDesignator variableDesignator, int instruction): " 
+							+ "DEF USE pair " + duPair + " logged with count " + count);
+				}else{
+					unknownDefUseMap.put(duPair, 1);
+					DebugLog.Log(_CLASS_INDENTIFIER_ + ".addUseDesignator(VariableDesignator variableDesignator, int instruction): " 
+							+ "DEF USE pair " + duPair + " logged with count 1");		
+				}
 				return;
 			}
-			int def_instruction = lastDefInstructionMap.get(token);			
+			int def_instruction = lastDefInstructionMap.get(token);		
+			int def_line =  lastDefLineMap.get(token);
 			Vector<Integer> duPair = new Vector<Integer>();
 			duPair.add(token);
 			duPair.add(def_instruction);
+			duPair.add(def_line);
 			duPair.add(instruction);
+			duPair.add(line);
 
 			if(defUsePairsMap.containsKey(duPair)){
 				Integer count = (Integer) defUsePairsMap.get(duPair);
@@ -917,7 +956,7 @@ public class IFProfiler
 			}
 		}
 	}
-	private final static String COLUMNS_4_HEADER = "VARIABLE,DEF INSTRUCTION,USE INSTRUCTION,COUNT";
+	private final static String COLUMNS_4_HEADER = "VARIABLE,DEF INSTRUCTION,DEF LINE,USE INSTRUCTION,USE LINE,COUNT";
 	public static void writeDefUseToCSV(){
 		FileWriter fileWriter = null;
 
@@ -938,7 +977,26 @@ public class IFProfiler
 				fileWriter.append(COMMA_DELIMITER);
 				fileWriter.append(key.get(2).toString());
 				fileWriter.append(COMMA_DELIMITER);
+				fileWriter.append(key.get(3).toString());
+				fileWriter.append(COMMA_DELIMITER);
+				fileWriter.append(key.get(4).toString());
+				fileWriter.append(COMMA_DELIMITER);
 				fileWriter.append(defUsePairsMap.get(key).toString());
+				fileWriter.append(NEW_LINE_SEPARATOR);
+			}
+			//Write a new student object list to the CSV file
+			for (Vector<Integer> key : unknownDefUseMap.keySet()) {
+				fileWriter.append(variableDesignatorMap.get(key.get(0)).toString());
+				fileWriter.append(COMMA_DELIMITER);
+				fileWriter.append(UNKNOWN_TAG);
+				fileWriter.append(COMMA_DELIMITER);
+				fileWriter.append(UNKNOWN_TAG);
+				fileWriter.append(COMMA_DELIMITER);
+				fileWriter.append(key.get(1).toString());
+				fileWriter.append(COMMA_DELIMITER);
+				fileWriter.append(key.get(2).toString());
+				fileWriter.append(COMMA_DELIMITER);
+				fileWriter.append(unknownDefUseMap.get(key).toString());
 				fileWriter.append(NEW_LINE_SEPARATOR);
 			}
 			System.out.println("CSV file '" + _DEFUSE_PAIR_COVERAGE +"' was created successfully");

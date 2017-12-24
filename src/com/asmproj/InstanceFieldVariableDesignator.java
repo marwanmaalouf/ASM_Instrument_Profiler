@@ -61,7 +61,7 @@ public class InstanceFieldVariableDesignator extends VariableDesignator{
 		if (obj instanceof InstanceFieldVariableDesignator)
 		{
 			InstanceFieldVariableDesignator d = (InstanceFieldVariableDesignator) obj;
-			return _className.equals(d._className) && _fieldName.equals(d._fieldName);
+			return _className.equals(d._className) && _fieldName.equals(d._fieldName) && _instance.equals(d._instance);
 		}
 		else
 		{

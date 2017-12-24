@@ -36,6 +36,8 @@ public class Testing_2 {
 	}
 	
 	public static void main(String[] args){		
+		System.out.println("here");
+
 		int x = -1;
 		
 		if(x < 0 )
@@ -50,6 +52,9 @@ public class Testing_2 {
 		else{
 			x = 2;
 		}
+
+		float u;
+		u = x;
 		
 		int h = 0;
 		try{
@@ -58,6 +63,7 @@ public class Testing_2 {
 			h = -1;
 		}
 		int z = -1;
+		
 		
 		int [] array_of_integers = {1, 2, 3, 4, 5};
 		for(int i = 0; i < 5; i++){
