@@ -5,13 +5,24 @@ import org.objectweb.asm.*;
 public class MyClassVisitor extends ClassVisitor {
 
 	protected String cClassName;
+	protected MyMethodVisitor mMethodVisitor;
+	protected String cJarFile;
 	
-    public MyClassVisitor(int api) {
+	
+    private MyClassVisitor(int api) {
         super(api);
     }
 
     public MyClassVisitor(int api, ClassVisitor cv) {
         super(api, cv);
+        mMethodVisitor = null;
+        cJarFile = "N/A";
+    }
+    
+    public MyClassVisitor(int api, ClassVisitor cv, String jarFile) {
+        super(api, cv);
+        mMethodVisitor = null;
+        cJarFile = jarFile;
     }
 
     @Override
@@ -31,7 +42,8 @@ public class MyClassVisitor extends ClassVisitor {
     public MethodVisitor visitMethod(int access, final String name, String desc, String signature, String[] exceptions) {
         System.out.println("Visiting method: " + name + desc);
         MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions);
-        return new MyMethodVisitor(api, mv, access, name, desc, signature, cClassName, exceptions);
+        mMethodVisitor = new MyMethodVisitor(api, mv, access, name, desc, signature, cClassName, exceptions, cJarFile);
+        return mMethodVisitor;
     }
 
     /**
@@ -85,7 +97,25 @@ public class MyClassVisitor extends ClassVisitor {
 
     @Override
     public void visitEnd() {
-        System.out.println("Method ends here");
+    	if(mMethodVisitor != null){
+    		if(!mMethodVisitor.staticBlockFound){
+    			MethodVisitor mv = super.visitMethod(Opcodes.ACC_STATIC, "<clinit>", 
+    					Type.getMethodDescriptor(Type.VOID_TYPE), null, null);
+    			mv.visitCode();
+    			Label l0 = new Label();
+    			mv.visitLabel(l0);
+    			mv.visitLineNumber(10, l0);
+    	    	mv.visitLdcInsn(cJarFile);
+    	    	mv.visitLdcInsn(cClassName);
+    	    	mv.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleClass",
+    					Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(String.class), Type.getType(String.class)), false);
+    	    	mv.visitInsn(Opcodes.RETURN);
+    	    	mv.visitMaxs(0, 0);
+    	    	mv.visitEnd();
+    		}  		
+    	}
+    	
+        System.out.println("Class ends here");
         super.visitEnd();
     }
 

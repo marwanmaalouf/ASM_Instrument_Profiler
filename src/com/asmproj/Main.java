@@ -43,7 +43,7 @@ public class Main {
 				if(entryName.endsWith(_CLASS)){
 					InputStream classFileInputStream;
 					classFileInputStream = jis.getInputStream(inputJarEntry);
-					ClassWriter cw = instrumentClassFile(classFileInputStream, entryName);
+					ClassWriter cw = instrumentClassFile(classFileInputStream, entryName, jarFile);
 					classFileInputStream.close();
 					bytes = cw.toByteArray();
 				}else{
@@ -78,25 +78,30 @@ public class Main {
 		}
 	}
 
-	private static ClassWriter instrumentClassFile(InputStream in, String className) throws IOException {
+	private static ClassWriter instrumentClassFile(InputStream in, String className, String jarFile) throws IOException {
 		System.out.println("Starting instrumentation of " + className);
 		ClassReader classReader = new ClassReader(in);
 		ClassNode classNode = new ClassNode();
-		classReader.accept(classNode,0);
+		classReader.accept(classNode, 0);
 		BasicBlockGenerator.buildClassBasicBlockDesignators(classNode);
 
 		ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
 
-		MyClassVisitor myClassVisitor = new MyClassVisitor(Opcodes.ASM5, classWriter);
+		MyClassVisitor myClassVisitor;
+		if(jarFile == null){
+			myClassVisitor = new MyClassVisitor(Opcodes.ASM5, classWriter);
+		}else{
+			myClassVisitor = new MyClassVisitor(Opcodes.ASM5, classWriter, jarFile);
+		}
 		classReader.accept(myClassVisitor, 0);
 		return classWriter;
 	}
 
-	private static void instrumentClassFile(String classFile, String outputFileName) {
+	private static void instrumentClassFile(String classFile, String outputFileName, String jarFile) {
 		try {
 			System.out.println("Loading " + classFile);
 			InputStream in = new FileInputStream(classFile);
-			ClassWriter classWriter = instrumentClassFile(in, classFile);
+			ClassWriter classWriter = instrumentClassFile(in, classFile, jarFile);
 			
 
 			final DataOutputStream dout = new DataOutputStream(new FileOutputStream(outputFileName));
@@ -127,7 +132,7 @@ public class Main {
 				System.out.println(outputFileName);
 				instrumentJarFile(filePath, outputFileName);
 			}else if(fileName.contains(_CLASS)){
-				instrumentClassFile(filePath, outputFileName);
+				instrumentClassFile(filePath, outputFileName, null);
 			}
 			
 			System.out.println("Output written to " + outputFileName);

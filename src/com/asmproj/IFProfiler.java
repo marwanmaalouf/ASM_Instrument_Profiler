@@ -85,6 +85,9 @@ public class IFProfiler
 	
 	public static void handleClass(String jarFile, String className)
 	{
+		System.out.println("Class accessed: ");
+		System.out.println("Jarfile: " + jarFile);
+		System.out.println("className: " + className);
 	}
 	
 	public static void toggleStatic(boolean value, int methodCallInstruction){
@@ -413,7 +416,9 @@ public class IFProfiler
 	public static void handleMethodEntry(String methodParam, int nLocals, int nParams, String className, String methodName, String desc)
 	{
 		parameterIndex = 0;
-		if(methodName.equals("<clinit>")){return;}
+		if(methodName.equals("<clinit>")){// to change
+			return;
+		}
 
 
 

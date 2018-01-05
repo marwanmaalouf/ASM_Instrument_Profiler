@@ -29,17 +29,18 @@ public class MyMethodVisitor extends MethodVisitor {
 	protected final MethodNode mMethodNode;
 	protected final String mClassName;
 	protected final String mMethodIdentifier;
+	protected final String mJarFile;
 	
 	protected final MyLocalVariableSorter mLocalVariablesSorter;
-
-	protected int mCounter = 0;// need to increment it at the end of each visit
+	protected static Hashtable<String, Boolean> _instrument = new Hashtable();
 
 	protected int m_localLocationCount;
 	protected LocalInfo[] m_localLocation;
 	protected int m_nLocals;
 
 	protected String m_strParamWrapper;
-	protected static Hashtable<String, Boolean> _instrument = new Hashtable();
+	
+	protected int mCounter = 0;// need to increment it at the end of each visit
 
 	protected String newLocalVariableName = null;
 	
@@ -51,7 +52,11 @@ public class MyMethodVisitor extends MethodVisitor {
 	protected int count = 0;
 	protected static int methodCallInstruction = -1;
 	
-	public MyMethodVisitor(int api, MethodVisitor mv, int access, String name, String desc, String signature, String className, String[] exceptions) {
+	
+	protected boolean staticBlockFound;
+	
+	public MyMethodVisitor(int api, MethodVisitor mv, int access, String name, String desc, String signature, String className, String[] exceptions,
+			String jarFile) {
 		super(api, mv);
 		mMethodNode = new MethodNode(access, name, desc, signature, exceptions);
 		mLocalVariablesSorter = new MyLocalVariableSorter(api, access, desc, mv);
@@ -59,8 +64,10 @@ public class MyMethodVisitor extends MethodVisitor {
 		mMethodSignature = desc;
 		mClassName = className;
 		mMethodIdentifier = mClassName +"." + mMethodName + mMethodSignature;
+		mJarFile = jarFile;
 		
 		foundInstruction = false;
+		staticBlockFound = false;
 		count = 0;
 		
 		leaders = (List<Integer>)BasicBlockGenerator._leadersPerMethod.get(mMethodIdentifier); 
@@ -81,11 +88,20 @@ public class MyMethodVisitor extends MethodVisitor {
 	@Override
 	public void visitCode() {
 		super.visitCode();
-//		super.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-//		super.visitLdcInsn("method: " + mMethodIdentifier);
-//		super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
-//		
+		super.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+		super.visitLdcInsn("method: " + mMethodIdentifier);
+		super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+		
 
+		
+		if(mMethodName.equals("<clinit>")){
+			staticBlockFound = true;
+			super.visitLdcInsn(mJarFile);
+			super.visitLdcInsn(mClassName);
+			super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleClass",
+					Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(String.class), Type.getType(String.class)), false);
+			System.out.println("augmented static = " + mMethodIdentifier);
+		}
 		
 		// Handle method Entry
 		super.visitLdcInsn("TBD");

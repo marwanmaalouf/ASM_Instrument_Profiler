@@ -343,6 +343,7 @@ public class BasicBlockGenerator {
 		printer = new Textifier();
 		mp = new TraceMethodVisitor(printer);
 		boolean isLeader = true;
+		System.out.println(methodNode.name + methodNode.desc);
 		for(AbstractInsnNode insn: methodNode.instructions.toArray()){
 			String instructionName = insnToString(insn);// Must keep it to maintain order of the labels
 			System.out.print(instructionName);
