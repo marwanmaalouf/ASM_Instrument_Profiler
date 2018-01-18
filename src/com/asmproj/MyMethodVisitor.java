@@ -1,665 +1,496 @@
 package com.asmproj;
 
-import org.objectweb.asm.AnnotationVisitor;
+import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Type.*;
+
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.TypePath;
-import org.objectweb.asm.commons.LocalVariablesSorter;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.LabelNode;
-import org.objectweb.asm.tree.MethodNode;
-
-import java.lang.reflect.Parameter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.List;
+import java.util.Set;
 
 
-// TODO: we need to find a solution for mSignature. we need to map m_strMethodSignature to desc
+// TODO:
+// Fix the output.csv -> replace 1 and 0 by actual string
+// Try to add java line
 
 public class MyMethodVisitor extends MethodVisitor {
 
-	protected final String mMethodName;
-	protected final String mMethodSignature;
-	protected final MethodNode mMethodNode;
-	protected final String mClassName;
-	protected final String mMethodIdentifier;
-	protected final String mJarFile;
-	
-	protected final MyLocalVariableSorter mLocalVariablesSorter;
-	protected static Hashtable<String, Boolean> _instrument = new Hashtable();
+	private static final Type STRING_TYPE = Type.getType(String.class);
+	private static final Type OBJECT_TYPE = Type.getType(Object.class);
+	private static final String PROFILER = "javaprofiler/dataflow/dupair/Profiler";
 
-	protected int m_localLocationCount;
-	protected LocalInfo[] m_localLocation;
-	protected int m_nLocals;
+	private final String mMethodName;
+	private final String mMethodSignature;
+	private final String mClassName;
+	private final String mMethodIdentifier;
+	private final String mJarFile;
+	
+	
+	MyLocalVariableSorter mLocalVariablesSorter;
+	private List<Runnable> delayedInstruction = new ArrayList<>();
+	private final List<Integer> leaders;
+	private final HashMap<Integer, String> localVariablesMap;
+	private int mLine;
+	private int nLocals;
+	private int nParams;
+	private int count;
+	private final boolean isConstructor;
+	private boolean seenSuperConstructor;	
+	private final boolean isImplemented;
+	
+	 private final Label start;
+	 private final Label end;
+     private final Label handler;
+     private int maxStack;
+     private int maxLocals;
 
-	protected String m_strParamWrapper;
-	
-	protected int mCounter = 0;// need to increment it at the end of each visit
-
-	protected String newLocalVariableName = null;
-	
-	
-	protected final List<Integer> leaders;
-	protected boolean foundInstruction;
-	protected int line = -1;
-	protected int mLine = 0;
-	protected int count = 0;
-	protected static int methodCallInstruction = -1;
-	
-	
-	protected boolean staticBlockFound;
-	
 	public MyMethodVisitor(int api, MethodVisitor mv, int access, String name, String desc, String signature, String className, String[] exceptions,
 			String jarFile) {
 		super(api, mv);
-		mMethodNode = new MethodNode(access, name, desc, signature, exceptions);
-		mLocalVariablesSorter = new MyLocalVariableSorter(api, access, desc, mv);
+
 		mMethodName = name;
 		mMethodSignature = desc;
 		mClassName = className;
 		mMethodIdentifier = mClassName +"." + mMethodName + mMethodSignature;
 		mJarFile = jarFile;
-		
-		foundInstruction = false;
-		staticBlockFound = false;
+
+		System.out.println("Augmenting: "+ mMethodIdentifier);
+		isConstructor = mMethodName.equals("<init>");
+		seenSuperConstructor=false;
 		count = 0;
+		mLine = 0;
+
+		leaders = (List<Integer>)BasicBlockGenerator._leadersPerMethod.get(mMethodIdentifier);
+		isImplemented =leaders.size() > 0;
 		
-		leaders = (List<Integer>)BasicBlockGenerator._leadersPerMethod.get(mMethodIdentifier); 
 		System.out.print(mClassName + "/" + mMethodName + mMethodSignature + "{ ");
 		for(int i = 0; i < leaders.size(); i++){
 			System.out.print(leaders.get(i) + " ");
 		}
 		System.out.println("}");
 		
-		_instrument.put("Field", Boolean.TRUE);
-		_instrument.put("DefUse", Boolean.TRUE);
-		_instrument.put("MethodCall", Boolean.FALSE);
-		_instrument.put("MethodCoverage", Boolean.TRUE);
+
+
+		localVariablesMap = (HashMap<Integer, String>) BasicBlockGenerator._localsPerMethod.get(mMethodIdentifier);
+		System.out.print("........................" + mClassName + "/" + mMethodName + mMethodSignature + "{ ");
+		for(int key : localVariablesMap.keySet()){
+			System.out.print(key + ":" + localVariablesMap.get(key) + " ");
+		}
+		System.out.println("}");
+
+		// STATIC VS NON STATIC
+		boolean isStatic = (access & ACC_STATIC) != 0;
+		if(isStatic){
+			System.out.println("Method is Static");
+		}else{
+			System.out.println("Method is NOT Static");
+		}
+
+		nLocals = 0;
+		for(final int key : localVariablesMap.keySet()){
+			nLocals = (key > nLocals)?key:nLocals;
+		}		
+
+		nParams = Type.getArgumentTypes(desc).length + (isStatic ? 0 : 1);
+
+		if(nParams > nLocals && isConstructor){
+			nLocals = nParams; 	
+			// When in a constructor of an inner class, ALOAD 0 and ALOAD 1 are called
+			// but only "this" is captured as a local variable
+		}
+		
+		System.out.println("nLocals: " + nLocals);
+		System.out.println("nParams: " + nParams);
+		
+		// Wrap the entire method in a try catch block
+		start = new Label();
+		end = new Label();
+		handler = new Label();
+		maxLocals = 0;
+		maxStack= 0;	
 	}
 
-	private List<String> methodParamsName = null;
-	
 	@Override
 	public void visitCode() {
-		super.visitCode();
-		super.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-		super.visitLdcInsn("method: " + mMethodIdentifier);
-		super.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
-		
-
-		
-		if(mMethodName.equals("<clinit>")){
-			staticBlockFound = true;
-			super.visitLdcInsn(mJarFile);
-			super.visitLdcInsn(mClassName);
-			super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleClass",
-					Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(String.class), Type.getType(String.class)), false);
-			System.out.println("augmented static = " + mMethodIdentifier);
-		}
-		
-		// Handle method Entry
-		super.visitLdcInsn("TBD");
-		super.visitLdcInsn(-1);
-		super.visitLdcInsn(-1);
-		super.visitLdcInsn(mClassName);
-		super.visitLdcInsn(mMethodName);
-		super.visitLdcInsn(mMethodSignature);
-		if(mMethodName.equals("main")){
-			super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleMainMethodEntry", 
-					Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(String.class), Type.INT_TYPE, Type.INT_TYPE, Type.getType(String.class),
-							Type.getType(String.class), Type.getType(String.class)), false);
-		}else{
-			super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleMethodEntry", 
-					Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(String.class), Type.INT_TYPE, Type.INT_TYPE, Type.getType(String.class),
-							Type.getType(String.class), Type.getType(String.class)), false);
-		}		
-		
-		
-		if(methodParamsName != null){
-			for(int i = 0; i < methodParamsName.size(); i++){
-				System.out.println("Adding parameter " + methodParamsName.get(i) +" with index " + i + " and instruction " + methodCallInstruction);
-		  	  	super.visitLdcInsn(methodParamsName.get(i));
-		  	  	super.visitLdcInsn(methodCallInstruction);
-		  	  	super.visitLdcInsn(mMethodIdentifier);
-		  	  	super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleParameterDef", 
-							Type.getMethodDescriptor(
-									Type.VOID_TYPE, 
-									Type.getType(String.class), 
-									Type.INT_TYPE, 
-									Type.getType(String.class)), false);
-			}
-
-			System.out.println("Clearing parameters");
-			methodParamsName = null;
-					
-		}
-		
-		
-		
-		m_localLocationCount = 0;
-		m_localLocation = new LocalInfo[100000];
+		super.visitCode();	
+		push(nLocals);
+		push(nParams);
+		addMethodInfo();
+		super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleMethodEntry", 
+				Type.getMethodDescriptor(VOID_TYPE, INT_TYPE, INT_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE), false);
 	}
 
 	@Override
 	public void visitEnd() {
 
+		// -------------------------------------------------------------------
+		// wrap method in a try catch block
+		if(isImplemented){
+			visitLabel(handler);
+			int index = mLocalVariablesSorter.createLocalVariable(OBJECT_TYPE);
+			super.visitVarInsn(ASTORE, index);
+			super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleMethodExitException", Type.getMethodDescriptor(VOID_TYPE), false);
+			super.visitVarInsn(ALOAD, index);
+			super.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Throwable", "printStackTrace", "()V", false);
+			super.visitLabel(end);
+			
+			super.visitTypeInsn(NEW, "java/lang/Throwable");
+			super.visitInsn(DUP);
+			super.visitMethodInsn(INVOKESPECIAL, "java/lang/Throwable", "<init>", Type.getMethodDescriptor(VOID_TYPE), false);
+			super.visitInsn(ATHROW);
+			super.visitInsn(RETURN);
+			super.visitMaxs(maxStack, maxLocals);
+		}
+		// -------------------------------------------------------------------
+
+	    
 		super.visitEnd();
+	}
+
+	@Override
+	public void visitMaxs(int maxStack, int maxLocals) {
+		// -------------------------------------------------------------------
+		// Wrap method in a try catch block
+		if(isImplemented){
+			/*
+			 * visitMaxs should be called directly before ending the method, so call is moved from here to visitEnd()
+			 */
+			this.maxStack = maxStack;
+			this.maxLocals = maxLocals;
+		}
+		// -------------------------------------------------------------------
+		else{
+			super.visitMaxs(maxStack, maxLocals);
+		}
 	}
 	
 	@Override
 	public void visitParameter(String name, int access) {
-		System.out.println("parameter: " + name);
-		if(methodParamsName == null){
-			methodParamsName = new ArrayList<String>();
-		}
-		methodParamsName.add(name);
-		super.visitParameter(name, access);
-		
+		super.visitParameter(name, access);	
 	}
-	
+
 	@Override
 	public void visitVarInsn(int opcode, int var) {
+//			System.out.println(OPCODE_NAMES[opcode] + " " + var);
+		
+		
 		checkForBasicBlock();
-		mLocalVariablesSorter.incrementLocalCounter(var);
 
-		if(_instrument.get("DefUse").booleanValue()){
-			// This should go in each store instance, but it will work if kept here for testing purposes
-
-			if (opcode == Opcodes.ISTORE) {
-				mCounter += 6;
-				super.visitInsn(Opcodes.DUP);
-				LoadOrStore(var, "handleLocalVariableDefINT", "(IILjava/lang/String;IILjava/lang/String;)V");
-
-			} else if (opcode == Opcodes.FSTORE) {
-				mCounter += 6;
-				super.visitInsn(Opcodes.DUP);
-				LoadOrStore(var, "handleLocalVariableDefFLOAT", "(FILjava/lang/String;IILjava/lang/String;)V");
-
-			} else if (opcode == Opcodes.DSTORE) {
-				mCounter += 6;
-				super.visitInsn(Opcodes.DUP2);
-				LoadOrStore(var, "handleLocalVariableDefDOUBLE", "(DILjava/lang/String;IILjava/lang/String;)V");
-
-			} else if (opcode == Opcodes.LSTORE) {
-				mCounter += 6;
-				super.visitInsn(Opcodes.DUP2);
-				LoadOrStore(var, "handleLocalVariableDefLONG", "(JILjava/lang/String;IILjava/lang/String;)V");
-
-			} else if (opcode == Opcodes.ASTORE) {
-				mCounter += 6;
-				super.visitInsn(Opcodes.DUP);
-				LoadOrStore(var, "handleLocalVariableObjectDef", "(Ljava/lang/Object;ILjava/lang/String;IILjava/lang/String;)V");
-
-			} else if (opcode == Opcodes.ILOAD) {
-				mCounter += 6;
-				super.visitVarInsn(Opcodes.ILOAD, var);
-				LoadOrStore(var, "handleLocalVariableUseI", "(IILjava/lang/String;IILjava/lang/String;)V");
-
-			} else if (opcode == Opcodes.FLOAD) {
-				mCounter += 6;
-				super.visitVarInsn(Opcodes.FLOAD, var);
-				LoadOrStore(var, "handleLocalVariableUseD", "(FILjava/lang/String;IILjava/lang/String;)V");
-
-			} else if (opcode == Opcodes.DLOAD) {
-				mCounter += 6;
-				super.visitVarInsn(Opcodes.DLOAD, var);
-				LoadOrStore(var, "handleLocalVariableUseD", "(DILjava/lang/String;IILjava/lang/String;)V");
-
-			} else if (opcode == Opcodes.LLOAD) {
-				mCounter += 6;
-				super.visitVarInsn(Opcodes.LLOAD, var);
-				LoadOrStore(var, "handleLocalVariableUseL", "(JILjava/lang/String;IILjava/lang/String;)V");
-
-			} else if (opcode == Opcodes.ALOAD) {
-				mCounter += 6;
-
-				// TODO: take care of case UNINITIALIZED_THIS
-				if (!(var == 0 && mMethodName.contains("<init>"))) {
-					super.visitVarInsn(Opcodes.ALOAD, var);
-					LoadOrStore(var, "handleLocalVariableObjectUse", "(Ljava/lang/Object;ILjava/lang/String;IILjava/lang/String;)V");
-				}
-
-			}
+		if(opcode == ILOAD
+				||   opcode == LLOAD
+				||	 opcode == FLOAD
+				||	 opcode == DLOAD
+				||	 opcode == ALOAD){
+			localVariableUse(var);
 		}
+		else if(opcode == ISTORE
+				||    opcode == LSTORE
+				||	  opcode == FSTORE
+				||	  opcode == DSTORE
+				||	  opcode == ASTORE){
+			localVariableDef(var);
+		}
+
 		super.visitVarInsn(opcode, var);
-		mCounter++;
 		count++;
 	}
 
 	@Override
 	public void visitLabel(Label label) {
-		if(leaders.contains(count)){
-			foundInstruction= true;
+		
+		// -------------------------------------------------------------------
+		// Wrap method in try catch block		
+		if((count == 0) && !isConstructor && isImplemented){
+			super.visitTryCatchBlock(start, end, handler, "java/lang/Throwable");
+			super.visitLabel(start);
 		}
-		checkForBasicBlock();
+		// -------------------------------------------------------------------
+
 		super.visitLabel(label);
+		
+		
 		count++;
+//		System.out.println("label offset: " + label.getOffset());
 	}
 
-	
+
 	@Override 
 	public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf){    	
 		checkForBasicBlock();
-		methodCallInstruction = count + 1;
-		if(opcode == Opcodes.INVOKESTATIC){
-	  	  	super.visitLdcInsn(true);
-	  	  	super.visitLdcInsn(methodCallInstruction);
-	  	  	super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "toggleStatic", 
-						Type.getMethodDescriptor(
-								Type.VOID_TYPE, 
-								Type.BOOLEAN_TYPE, 
-								Type.INT_TYPE), false);
-		}else{
-			super.visitLdcInsn(false);
-	  	  	super.visitLdcInsn(methodCallInstruction);
-	  	  	super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "toggleStatic", 
-						Type.getMethodDescriptor(
-								Type.VOID_TYPE, 
-								Type.BOOLEAN_TYPE, 
-								Type.INT_TYPE), false);
-		}
 		
-		
-		if(_instrument.get("MethodCall").booleanValue()){
+		//System.out.println(OPCODE_NAMES[opcode] + " " + owner + "." + name + " " + desc);
 
-			if(opcode == Opcodes.INVOKEVIRTUAL || opcode == Opcodes.INVOKEINTERFACE){
-
-				// Store passed arguments
-				String calledClassName = owner;
-				String calledMethodName = name;
-				String calledMethodSignature = desc;
-
-				// Retrieve types of arguments and if there is a return value
-				Type [] argumentTypes = Type.getArgumentTypes(desc); // get type of arguments
-				Type returnType = Type.getReturnType(desc); // get return type
-				boolean bReturnsValue = !(returnType.equals(Type.VOID_TYPE));
-
-				// Create an array to log the index of the variables we will create to store the arguments
-				int [] newVariableIndexes = new int[argumentTypes.length];
-				for(int i = 0; i < argumentTypes.length; i++){
-					newVariableIndexes[i] = mLocalVariablesSorter.createLocalVariable(argumentTypes[i]);
-				}
-
-				// Create a local variable to save THIS
-				int instanceVariableIndex =
-						mLocalVariablesSorter.createLocalVariable(Type.getType(Object.class));
-
-				// Save the arguments if any
-				if(argumentTypes.length > 0){
-					mCounter += argumentTypes.length;
-					for (int i = argumentTypes.length - 1; i >= 0; i--){
-						super.visitVarInsn(createStore(argumentTypes[i]), newVariableIndexes[i]);
-					}
-					super.visitInsn(Opcodes.DUP);
-					mCounter += 1;
-				}else{
-					super.visitInsn(Opcodes.DUP);
-					mCounter += 1;
-				}
-
-				// Save the instance
-				mCounter += 1;
-				super.visitVarInsn(Opcodes.ASTORE, instanceVariableIndex);
-
-				mCounter += 8;
-				int callInstruction = mCounter + argumentTypes.length; // include the loads
-				super.visitVarInsn(Opcodes.ALOAD, instanceVariableIndex);
-				super.visitLdcInsn(calledMethodName);
-				super.visitLdcInsn(calledMethodSignature);
-				super.visitLdcInsn(argumentTypes.length);
-				super.visitLdcInsn(callInstruction);
-				super.visitLdcInsn(bReturnsValue);
-				super.visitLdcInsn(mMethodIdentifier);
-				super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceMethodCall", 
-						"(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;IIZLjava/lang/String;)V", false);
-
-
-				// Restore the method arguments
-				for (int j = 0; j < argumentTypes.length; j++)
-				{
-					super.visitVarInsn(createLoad(argumentTypes[j]), newVariableIndexes[j]);
-				}
-
-				super.visitMethodInsn(opcode, owner, name, desc, itf);
-				mCounter++;
-				
-				mCounter = callInstruction + 8;
-				
-				super.visitVarInsn(Opcodes.ALOAD, instanceVariableIndex);
-				super.visitLdcInsn(calledClassName);
-				super.visitLdcInsn(calledMethodName);
-				super.visitLdcInsn(calledMethodSignature);
-				super.visitLdcInsn(callInstruction);
-				super.visitLdcInsn(bReturnsValue);
-				super.visitLdcInsn(mMethodIdentifier);
-				super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceMethodReturn", 
-						"(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IZLjava/lang/String;)V", false);
-			
-			}
-			else{
-				super.visitMethodInsn(opcode, owner, name, desc, itf);
-				mCounter++;
-			}
-		}else{
+		if(opcode == INVOKESPECIAL && isConstructor && !seenSuperConstructor){
 			super.visitMethodInsn(opcode, owner, name, desc, itf);
-			mCounter++;
+			count++;
+			System.out.println("  First invokeSpecial goes to: "+ owner + " / " + name);
+			seenSuperConstructor=true;
+			
+			// -------------------------------------------------------------------
+			// Wrap method in try catch block
+			if(isConstructor && isImplemented){
+				super.visitTryCatchBlock(start, end, handler, "java/lang/Exception");
+				super.visitLabel(start);
+			}
+			// -------------------------------------------------------------------
+
+			
+			while(!delayedInstruction.isEmpty()){
+				Runnable r = delayedInstruction.remove(0);
+				r.run();
+			}
+			System.out.println("  Successfully added delayed code");
+		}else{
+
+			if(opcode == INVOKEVIRTUAL || opcode == INVOKEINTERFACE){
+				addMethodInfo();
+				push(count);
+				push(mLine);
+				super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleAllMethodCall", 
+						Type.getMethodDescriptor(VOID_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE), false);
+
+			}
+
+			else if(opcode == INVOKESPECIAL || opcode == INVOKESTATIC){
+				addMethodInfo();
+				push(count);
+				push(mLine);
+				super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleAllMethodCall", 
+						Type.getMethodDescriptor(VOID_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE), false);
+			}
+
+			super.visitMethodInsn(opcode, owner, name, desc, itf);
+			count++;
 		}
-		count++;
 	}
 
 	@Override
 	public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs){
 		checkForBasicBlock();
 		super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs);
-		mCounter++;
 		count++;
 	}
 
 	@Override
 	public void visitJumpInsn(int opcode, Label label){
 		checkForBasicBlock();
+
 		super.visitJumpInsn(opcode, label);
-		mCounter++;
 		count++;
 	}
 
 	@Override
 	public void visitLocalVariable(String name, String desc, String signature, Label start, Label end, int index){
 		checkForBasicBlock();
-		System.out.println("Local variable: " + name + " with index " + index + " " + desc);
 		super.visitLocalVariable(name, desc, signature, start, end, index);
-		mCounter++;
-		//count++;
 	}
 
+	
 	@Override
 	public void visitFieldInsn(int opcode, String owner, String name, String desc){        
 		checkForBasicBlock();
-		if(_instrument.get("Field").booleanValue()){
-			
-			
-			if(opcode == Opcodes.GETFIELD){
-				Type fieldType = Type.getType(desc);
 
-				int tempindex = mLocalVariablesSorter.createLocalVariable(Type.getType( (new Object()).getClass() ));
+		if(opcode == GETFIELD){
+			super.visitInsn(DUP);
+			super.visitLdcInsn(name);
+			super.visitLdcInsn(owner);
+			addMethodInfo();
+			push(count);
+			push(mLine);
+			super.visitMethodInsn(INVOKESTATIC, "javaprofiler/dataflow/dupair/Profiler", "handleInstanceFieldUse",
+					Type.getMethodDescriptor(VOID_TYPE, OBJECT_TYPE,STRING_TYPE, STRING_TYPE,
+							STRING_TYPE, STRING_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE), false);
+		}
 
-				mCounter += 10;
+		else if(opcode == GETSTATIC){
+			super.visitLdcInsn(name);
+			super.visitLdcInsn(owner);
+			addMethodInfo();
+			push(count);
+			push(mLine);
+			super.visitMethodInsn(INVOKESTATIC, "javaprofiler/dataflow/dupair/Profiler", "handleStaticFieldUse", 
+					Type.getMethodDescriptor(VOID_TYPE,  STRING_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE,
+							INT_TYPE, INT_TYPE), false);
+		}
 
-				super.visitVarInsn(Opcodes.ASTORE, tempindex);
-				super.visitVarInsn(Opcodes.ALOAD, tempindex);
-				super.visitInsn(Opcodes.DUP);
-				super.visitFieldInsn(Opcodes.GETFIELD, owner, name, desc);
-				super.visitLdcInsn(owner);
+		else if(opcode == PUTFIELD){
+			if(isConstructor && !seenSuperConstructor){
+				System.out.println("  Setting: "+ name +" before invokeSpecial");
+				int tempCount = count;
+				int line = mLine;
+//				delayedInstruction.add(() -> super.visitVarInsn(ALOAD, 0));
+//				delayedInstruction.add(() -> super.visitLdcInsn(name));
+//				delayedInstruction.add(() -> super.visitLdcInsn(owner));
+//				delayedInstruction.add(() -> addMethodInfo());
+//				delayedInstruction.add(() -> push(tempCount));
+//				delayedInstruction.add(() -> push(line));
+//				delayedInstruction.add(() -> super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleInstanceFieldDef", 
+//						Type.getMethodDescriptor(VOID_TYPE, OBJECT_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE,
+//								INT_TYPE, INT_TYPE), false));
+				
+
+				// JDK7 compatible
+				delayedInstruction.add(new ALOAD_0_Instruction(this));
+				delayedInstruction.add(new LDC_Instruction(this, name));
+				delayedInstruction.add(new LDC_Instruction(this, owner));
+				delayedInstruction.add(new LDC_Instruction(this, mClassName));
+				delayedInstruction.add(new LDC_Instruction(this, mMethodName));
+				delayedInstruction.add(new LDC_Instruction(this, mMethodSignature));
+				delayedInstruction.add(new Push_Instruction(this, tempCount));
+				delayedInstruction.add(new Push_Instruction(this, line));
+				delayedInstruction.add(new Method_Instruction(this, "handleInstanceFieldDef", 
+						Type.getMethodDescriptor(VOID_TYPE, OBJECT_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE,
+								INT_TYPE, INT_TYPE)));
+			}else{
+				Type type = Type.getType(desc);
+				if(type == LONG_TYPE || type == DOUBLE_TYPE){
+					super.visitInsn(DUP2_X1);
+					super.visitInsn(POP2);
+					super.visitInsn(DUP2_X2);
+				}else{
+					super.visitInsn(DUP2);
+					super.visitInsn(POP);
+				}
 				super.visitLdcInsn(name);
-				super.visitLdcInsn(count);
-				super.visitLdcInsn(mLine);
-				super.visitLdcInsn(mMethodIdentifier);
-
-				if(fieldType.equals(Type.INT_TYPE) || fieldType.equals(Type.CHAR_TYPE) || fieldType.equals(Type.BOOLEAN_TYPE)
-						|| fieldType.equals(Type.SHORT_TYPE)){
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldUseINT", "(Ljava/lang/Object;ILjava/lang/String;Ljava/lang/String;IILjava/lang/String;)V", false);
-				}else if(fieldType.equals(Type.DOUBLE_TYPE)){
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldUseDOUBLE", "(Ljava/lang/Object;DLjava/lang/String;Ljava/lang/String;IILjava/lang/String;)V", false);
-
-				}else if(fieldType.equals(Type.FLOAT_TYPE)){
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldUseFLOAT", "(Ljava/lang/Object;FLjava/lang/String;Ljava/lang/String;IILjava/lang/String;)V", false);
-
-				}else if(fieldType.equals(Type.LONG_TYPE)){
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldUseLONG", "(Ljava/lang/Object;JLjava/lang/String;Ljava/lang/String;IILjava/lang/String;)V", false);
-
-				}else{// reference type
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldObjectUse", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;IILjava/lang/String;)V", false);
-				}
-
-				super.visitVarInsn(Opcodes.ALOAD, tempindex);
-			} else if(opcode == Opcodes.PUTFIELD){
-				Type fieldType = Type.getType(desc);
-				
-				String strParamWrapperField = fieldType.getClassName() + "|" + name;
-	   
-				if(fieldType.equals(Type.INT_TYPE) || fieldType.equals(Type.CHAR_TYPE) || fieldType.equals(Type.BOOLEAN_TYPE)
-						|| fieldType.equals(Type.SHORT_TYPE)){
-					mCounter += 5;
-					
-					super.visitInsn(Opcodes.DUP2);
-					super.visitLdcInsn(name);
-					super.visitLdcInsn(count);
-					super.visitLdcInsn(mLine);
-					super.visitLdcInsn(mClassName);
-					
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldDefINT", "(Ljava/lang/Object;ILjava/lang/String;IILjava/lang/String;)V", false);
-				}else if(fieldType.equals(Type.DOUBLE_TYPE)){
-					mCounter += 10;
-					
-					int valueTempIndex = mLocalVariablesSorter.createLocalVariable(Type.DOUBLE_TYPE);
-					int objectTempIndex = mLocalVariablesSorter.createLocalVariable(Type.getType( (new Object()).getClass() ));
-				
-					super.visitVarInsn(Opcodes.DSTORE, valueTempIndex);
-					super.visitVarInsn(Opcodes.ASTORE, objectTempIndex);
-					super.visitVarInsn(Opcodes.ALOAD, objectTempIndex);
-					super.visitVarInsn(Opcodes.DLOAD, valueTempIndex);
-					super.visitLdcInsn(name);
-					super.visitLdcInsn(mCounter);
-					super.visitLdcInsn(mLine);
-					super.visitLdcInsn(mMethodIdentifier);
-					
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldDefDOUBLE", "(Ljava/lang/Object;DLjava/lang/String;IILjava/lang/String;)V", false);
-				
-					super.visitVarInsn(Opcodes.ALOAD, objectTempIndex);
-					super.visitVarInsn(Opcodes.DLOAD, valueTempIndex);
-				}else if(fieldType.equals(Type.FLOAT_TYPE)){
-					mCounter += 5;
-					
-					super.visitInsn(Opcodes.DUP2);
-					super.visitLdcInsn(name);
-					super.visitLdcInsn(count);
-					super.visitLdcInsn(mLine);
-					super.visitLdcInsn(mClassName);
-					
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldDefFLOAT", "(Ljava/lang/Object;FLjava/lang/String;IILjava/lang/String;)V", false);
-				}else if(fieldType.equals(Type.LONG_TYPE)){
-					mCounter += 10;
-					
-					int valueTempIndex = mLocalVariablesSorter.createLocalVariable(Type.LONG_TYPE);
-					int objectTempIndex = mLocalVariablesSorter.createLocalVariable(Type.getType( Object.class ));
-				
-					super.visitVarInsn(Opcodes.LSTORE, valueTempIndex);
-					super.visitVarInsn(Opcodes.ASTORE, objectTempIndex);
-					super.visitVarInsn(Opcodes.ALOAD, objectTempIndex);
-					super.visitVarInsn(Opcodes.LLOAD, valueTempIndex);
-					super.visitLdcInsn(name);
-					super.visitLdcInsn(count);
-					super.visitLdcInsn(mLine);
-					super.visitLdcInsn(mClassName);
-					
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldDefLONG", "(Ljava/lang/Object;JLjava/lang/String;IILjava/lang/String;)V", false);
-				
-					super.visitVarInsn(Opcodes.ALOAD, objectTempIndex);
-					super.visitVarInsn(Opcodes.LLOAD, valueTempIndex);
-				}else{// reference type
-					mCounter += 5;
-					// TODO:Bug when we have an uninitialized this
-
-					boolean uninithializedThis =mMethodName.contains("<init>") && name.equals("this$0"); 
-					if(!uninithializedThis){
-				
-					
-						super.visitInsn(Opcodes.DUP2);
-					
-						super.visitLdcInsn(name);
-						super.visitLdcInsn(count);
-						super.visitLdcInsn(mLine);
-						super.visitLdcInsn(mClassName);
-					
-						super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleInstanceFieldObjectDef", "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;IILjava/lang/String;)V", false);
-				
-					}
-				}
-			} else if(opcode == Opcodes.GETSTATIC){ //GETSTATIC
-				Type fieldType = Type.getType(desc);
-
-				mCounter += 6;
-				super.visitFieldInsn(opcode, owner, name, desc);
 				super.visitLdcInsn(owner);
-				super.visitLdcInsn(name);
-				super.visitLdcInsn(count);
-				super.visitLdcInsn(mLine);
-				super.visitLdcInsn(mMethodIdentifier);
-
-				if(fieldType.equals(Type.INT_TYPE) || fieldType.equals(Type.CHAR_TYPE) || fieldType.equals(Type.BOOLEAN_TYPE)
-						|| fieldType.equals(Type.SHORT_TYPE)){
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldUseINT", "(ILjava/lang/String;Ljava/lang/String;IILjava/lang/String;)V", false);
-				}else if(fieldType.equals(Type.DOUBLE_TYPE)){
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldUseDOUBLE", "(DLjava/lang/String;Ljava/lang/String;IILjava/lang/String;)V", false);
-
-				}else if(fieldType.equals(Type.FLOAT_TYPE)){
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldUseFLOAT", "(FLjava/lang/String;Ljava/lang/String;IILjava/lang/String;)V", false);
-
-				}else if(fieldType.equals(Type.LONG_TYPE)){
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldUseLONG", "(JLjava/lang/String;Ljava/lang/String;IILjava/lang/String;)V", false);
-
-				}else{// reference type
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldObjectUse", "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;IILjava/lang/String;)V", false);
-				}
-			} else if(opcode == Opcodes.PUTSTATIC){
-				Type fieldType = Type.getType(desc);
-				
-				String strParamWrapperField = fieldType.getClassName() + "|" + name;
-	   
-				if(fieldType.equals(Type.INT_TYPE) || fieldType.equals(Type.CHAR_TYPE) || fieldType.equals(Type.BOOLEAN_TYPE)
-						|| fieldType.equals(Type.SHORT_TYPE)){
-					mCounter += 5;
-					
-					super.visitInsn(Opcodes.DUP);
-					super.visitLdcInsn(name);
-					super.visitLdcInsn(count);
-					super.visitLdcInsn(mLine);
-					super.visitLdcInsn(mClassName);
-					
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldDefINT", "(ILjava/lang/String;IILjava/lang/String;)V", false);
-				}else if(fieldType.equals(Type.DOUBLE_TYPE)){
-					mCounter += 5;
-					
-					super.visitInsn(Opcodes.DUP2);
-					super.visitLdcInsn(name);
-					super.visitLdcInsn(mCounter);
-					super.visitLdcInsn(mLine);
-					super.visitLdcInsn(mClassName);
-					
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldDefDOUBLE", "(DLjava/lang/String;IILjava/lang/String;)V", false);
-				}else if(fieldType.equals(Type.FLOAT_TYPE)){
-					mCounter += 5;
-					
-					super.visitInsn(Opcodes.DUP);
-					super.visitLdcInsn(name);
-					super.visitLdcInsn(count);
-					super.visitLdcInsn(mLine);
-					super.visitLdcInsn(mClassName);
-					
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldDefFLOAT", "(FLjava/lang/String;IILjava/lang/String;)V", false);
-				}else if(fieldType.equals(Type.LONG_TYPE)){
-					mCounter += 5;
-					
-					super.visitInsn(Opcodes.DUP2);
-					super.visitLdcInsn(name);
-					super.visitLdcInsn(count);
-					super.visitLdcInsn(mLine);
-					super.visitLdcInsn(mClassName);
-					
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldDefLONG", "(JLjava/lang/String;IILjava/lang/String;)V", false);
-				}else{// reference type
-					mCounter += 5;
-					
-					super.visitInsn(Opcodes.DUP);
-					super.visitLdcInsn(name);
-					super.visitLdcInsn(count);
-					super.visitLdcInsn(mLine);
-					super.visitLdcInsn(mClassName);
-					
-					super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleStaticFieldObjectDef", "(Ljava/lang/Object;Ljava/lang/String;IILjava/lang/String;)V", false);
-				}
+				addMethodInfo();
+				push(count);
+				push(mLine);
+				super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleInstanceFieldDef", 
+						Type.getMethodDescriptor(VOID_TYPE,  
+								OBJECT_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE,
+								INT_TYPE, INT_TYPE), false);
 			}
 		}
+
+
+		else if (opcode == PUTSTATIC) {
+			super.visitLdcInsn(owner);
+			super.visitLdcInsn(name);
+			addMethodInfo();
+			push(count);
+			push(mLine);
+			super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleStaticFieldUse", 
+					Type.getMethodDescriptor(VOID_TYPE,  STRING_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE,
+							INT_TYPE, INT_TYPE), false);
+		}
+
 		super.visitFieldInsn(opcode, owner, name, desc);
-		mCounter++;
+
 		count++;
 	}
 
+	
 	@Override
-	public void visitInsn(int opcode) {
+	public void visitInsn(int opcode) {		
 		checkForBasicBlock();
-		if(_instrument.get("MethodCoverage")){
-	       switch(opcode) {
-	          case Opcodes.IRETURN:
-	          case Opcodes.FRETURN:
-	          case Opcodes.ARETURN:
-	          case Opcodes.LRETURN:
-	          case Opcodes.DRETURN:
-	        	  super.visitLdcInsn(true);
-	        	  super.visitLdcInsn(mCounter);
-	        	  super.visitLdcInsn(mClassName);
-	        	  super.visitLdcInsn(mMethodName);
-	        	  super.visitLdcInsn(mMethodSignature);
-	        	  super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleMethodExit", 
-		  					Type.getMethodDescriptor(Type.VOID_TYPE, Type.BOOLEAN_TYPE, Type.INT_TYPE, Type.getType(String.class),
-		  							Type.getType(String.class), Type.getType(String.class)), false);
-	        	  break;
-	          case Opcodes.RETURN:
-	        	  super.visitLdcInsn(false);
-	        	  super.visitLdcInsn(mCounter);
-	        	  super.visitLdcInsn(mClassName);
-	        	  super.visitLdcInsn(mMethodName);
-	        	  super.visitLdcInsn(mMethodSignature);
-	        	  super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleMethodExit", 
-		  					Type.getMethodDescriptor(Type.VOID_TYPE, Type.BOOLEAN_TYPE, Type.INT_TYPE, Type.getType(String.class),
-		  							Type.getType(String.class), Type.getType(String.class)), false);
-	              break;
-	          default: // do nothing
-	        }
+		if(opcode == AALOAD
+				||  opcode == BALOAD
+				||  opcode == CALOAD
+				||  opcode == DALOAD
+				||  opcode == FALOAD
+				||  opcode == IALOAD
+				||  opcode == LALOAD
+				||  opcode == SALOAD){
+
+			super.visitInsn(DUP2);
+			addMethodInfo();
+			push(count);
+			push(mLine);
+			super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleArrayElementUse",
+					Type.getMethodDescriptor(VOID_TYPE, OBJECT_TYPE, INT_TYPE, 
+							STRING_TYPE, STRING_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE), false);
 		}
-		
-		
-		
-		
-		if(_instrument.get("DefUse").booleanValue()){
-			
-			if (opcode == Opcodes.AASTORE) {
-                arrayStore(Type.getType(Object.class),Opcodes.ASTORE,Opcodes.ALOAD,"handleArrayElementObjectDef");
-            } else if (opcode == Opcodes.DASTORE) {
-                arrayStore(Type.DOUBLE_TYPE,Opcodes.DSTORE,Opcodes.DLOAD,"handleArrayElementDefDOUBLE");
-            } else if (opcode == Opcodes.FASTORE) {
-                arrayStore(Type.FLOAT_TYPE,Opcodes.FSTORE,Opcodes.FLOAD,"handleArrayElementDefFLOAT");
-            } else if (opcode == Opcodes.LASTORE) {
-                arrayStore(Type.LONG_TYPE, Opcodes.LSTORE, Opcodes.LLOAD, "handleArrayElementDefLONG");
-            } else if (opcode == Opcodes.BASTORE ||
-                    opcode == Opcodes.CASTORE ||
-                    opcode == Opcodes.IASTORE ||
-                    opcode == Opcodes.SASTORE) {
-                arrayStore(Type.INT_TYPE, Opcodes.ISTORE, Opcodes.ILOAD, "handleArrayElementDefINT");
-            } else if(opcode == Opcodes.CALOAD ||
-                    opcode == Opcodes.IALOAD ||
-                    opcode == Opcodes.BALOAD ||
-                    opcode == Opcodes.SALOAD){
-                arrayLoad(Type.INT_TYPE,opcode,"handleArrayElementUseINT");
-            }else if(opcode == Opcodes.LALOAD){
-                arrayLoad(Type.LONG_TYPE,opcode,"handleArrayElementUseLONG");
-            }else if(opcode == Opcodes.FALOAD){
-                arrayLoad(Type.FLOAT_TYPE,opcode,"handleArrayElementUseFLOAT");
-            }else if(opcode == Opcodes.DALOAD){
-                arrayLoad(Type.DOUBLE_TYPE,opcode,"handleArrayElementUseDOUBLE");
-            }else if(opcode == Opcodes.AALOAD){
-                arrayLoad(Type.getType(Object.class),opcode,"handleArrayElementObjectUse");
-            }
+
+		else if(opcode == AASTORE){
+			int index = mLocalVariablesSorter.createLocalVariable(OBJECT_TYPE);
+			super.visitVarInsn(ASTORE, index);
+			super.visitInsn(DUP2);
+			addMethodInfo();
+			push(count);
+			push(mLine);
+			super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleArrayElementDef", 
+					Type.getMethodDescriptor(VOID_TYPE, OBJECT_TYPE, INT_TYPE, STRING_TYPE,
+							STRING_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE), false);
+			super.visitVarInsn(ALOAD, index);
 		}
-			
+
+		else if(opcode == BASTORE
+				|| opcode == CASTORE
+				|| opcode == IASTORE
+				|| opcode == SASTORE){
+			int index = mLocalVariablesSorter.createLocalVariable(INT_TYPE);
+			super.visitVarInsn(ISTORE, index);
+			super.visitInsn(DUP2);
+			addMethodInfo();
+			push(count);
+			push(mLine);
+			super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleArrayElementDef", 
+					Type.getMethodDescriptor(VOID_TYPE, OBJECT_TYPE, INT_TYPE, STRING_TYPE,
+							STRING_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE), false);
+			super.visitVarInsn(ILOAD, index);
+		}
+
+		else if (opcode == DASTORE) {
+			int index = mLocalVariablesSorter.createLocalVariable(DOUBLE_TYPE);
+			super.visitVarInsn(DSTORE, index);
+			super.visitInsn(DUP2);
+			addMethodInfo();
+			push(count);
+			push(mLine);
+			super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleArrayElementDef", 
+					Type.getMethodDescriptor(VOID_TYPE, OBJECT_TYPE, INT_TYPE, STRING_TYPE,
+							STRING_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE), false);
+			super.visitVarInsn(DLOAD, index);
+		}
+
+		else if(opcode == FASTORE){
+			int index = mLocalVariablesSorter.createLocalVariable(FLOAT_TYPE);
+			super.visitVarInsn(FSTORE, index);
+			super.visitInsn(DUP2);
+			addMethodInfo();
+			push(count);
+			push(mLine);
+			super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleArrayElementDef", 
+					Type.getMethodDescriptor(VOID_TYPE, OBJECT_TYPE, INT_TYPE, STRING_TYPE,
+							STRING_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE), false);
+			super.visitVarInsn(FLOAD, index);
+		}
+
+		else if(opcode == LASTORE){
+			int index = mLocalVariablesSorter.createLocalVariable(LONG_TYPE);
+			super.visitVarInsn(LSTORE, index);
+			super.visitInsn(DUP2);
+			addMethodInfo();
+			push(count);
+			push(mLine);
+			super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleArrayElementDef", 
+					Type.getMethodDescriptor(VOID_TYPE, OBJECT_TYPE, INT_TYPE, STRING_TYPE,
+							STRING_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE), false);
+			super.visitVarInsn(LLOAD, index);
+		}
+
+		else if(
+				opcode == ARETURN
+				|| opcode == DRETURN
+				|| opcode == FRETURN
+				|| opcode == IRETURN
+				|| opcode == LRETURN
+				|| opcode == RETURN
+				){
+			super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleMethodExit", 
+					Type.getMethodDescriptor(VOID_TYPE), false);
+		}
+
+		//System.out.println(OPCODE_NAMES[opcode]);
 		super.visitInsn(opcode);
-		mCounter++;
+
 		count++;
 	}
 
@@ -669,47 +500,51 @@ public class MyMethodVisitor extends MethodVisitor {
 		checkForBasicBlock();
 		count++;
 	}
-	
+
 	@Override
 	public void visitIincInsn(int var, int increment) {
 		checkForBasicBlock();
+
+		localVariableUse(var);
+		localVariableDef(var);
+
 		super.visitIincInsn(var, increment);
+
 		count++;
 	}
-	
+
+
+
 	@Override
 	public void visitLdcInsn(Object cst) {
 		checkForBasicBlock();
+
 		super.visitLdcInsn(cst);
+
 		count++;
 	}
-	
+
 	@Override
 	public void visitIntInsn(int opcode, int operand) {
 		checkForBasicBlock();
 		super.visitIntInsn(opcode, operand);
 		count++;
 	}
-	
+
 	@Override
 	public void visitLineNumber(int line, Label start) {
-		super.visitLineNumber(line, start);
-		if(foundInstruction){
-			foundInstruction = false;
-			this.line = line;
-			System.out.println("Basic block @line: " + line);
-		}
 		mLine = line;
-		count++;
+		super.visitLineNumber(line, start);
+		count++;		
 	}
-	
+
 	@Override
 	public void visitLookupSwitchInsn(Label dflt, int[] keys, Label[] labels) {
 		checkForBasicBlock();
 		super.visitLookupSwitchInsn(dflt, keys, labels);
 		count++;
 	}
-	
+
 	@Override
 	public void visitMultiANewArrayInsn(String desc, int dims) {
 		checkForBasicBlock();
@@ -719,7 +554,7 @@ public class MyMethodVisitor extends MethodVisitor {
 
 	@Override
 	public void visitTableSwitchInsn(int min, int max, Label dflt, Label... labels) {
-		checkForBasicBlock();
+		checkForBasicBlock();	
 		super.visitTableSwitchInsn(min, max, dflt, labels);
 		count++;
 	}
@@ -735,138 +570,291 @@ public class MyMethodVisitor extends MethodVisitor {
 		super.visitTypeInsn(opcode, type);
 		count++;
 	}
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+
+
 	// ############################SUPPORT FUNCTIONS##############################//
-	/**
-	 * Helper function, returns the XSTORE Opcode corresponding to the given type
-	 * @param t: Type of the object to be stored
-	 * @return
-	 */
-	protected int createStore(Type t){
-		int opcode = -1;
-		if(t.equals(Type.BYTE_TYPE) || t.equals(Type.BOOLEAN_TYPE) || t.equals(Type.CHAR_TYPE) 
-				|| t.equals(Type.SHORT_TYPE) || t.equals(Type.INT_TYPE)){
-			opcode = Opcodes.ISTORE;
-		}else if(t.equals(Type.DOUBLE_TYPE)){
-			opcode = Opcodes.DSTORE;
-		}else if(t.equals(Type.FLOAT_TYPE)){
-			opcode = Opcodes.FSTORE;
-		}else if(t.equals(Type.LONG_TYPE)){
-			opcode = Opcodes.LSTORE;
-		}else{
-			opcode = Opcodes.ASTORE; 
+	private void checkForBasicBlock(){
+		if(leaders.contains(count)){
+			push(count);
+			push(mLine);
+			super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleBBEntry",
+					Type.getMethodDescriptor(VOID_TYPE, INT_TYPE, INT_TYPE), false);
 		}
-		return opcode;
 	}
 
 	/**
-	 * Helper function, returns the XLOAD Opcode corresponding to the given type
-	 * @param t: Type of the object to be stored
-	 * @return
+	 * returns {@link #CONSUME_STACK}[opcode] as per BCEL @since 6.0
+	 * @param opcode
+	 * @return Number of words consumed on operand stack
 	 */
-	protected int createLoad(Type t){
-		int opcode = -1;
-		if(t.equals(Type.BYTE_TYPE) || t.equals(Type.BOOLEAN_TYPE) || t.equals(Type.CHAR_TYPE) 
-				|| t.equals(Type.SHORT_TYPE) || t.equals(Type.INT_TYPE)){
-			opcode = Opcodes.ILOAD;
-		}else if(t.equals(Type.DOUBLE_TYPE)){
-			opcode = Opcodes.DLOAD;
-		}else if(t.equals(Type.FLOAT_TYPE)){
-			opcode = Opcodes.FLOAD;
-		}else if(t.equals(Type.LONG_TYPE)){
-			opcode = Opcodes.LLOAD;
-		}else{
-			opcode = Opcodes.ALOAD; 
+	private static int getConsumeStack(final int opcode) {
+		return CONSUME_STACK[opcode];
+	}
+
+
+
+	/**
+	 * returns {@link #PRODUCE_STACK}[opcode] as per BCEL @since 6.0
+	 * @param opcode
+	 * @return Number of words produced onto operand stack
+	 */
+	public static int getProduceStack(final int opcode) {
+		return PRODUCE_STACK[opcode];
+	}
+
+	public final void push(final int value) {
+		//System.out.println(value);
+		if(value >= -1 && value <= 5) {
+			super.visitInsn(ICONST_0 + value);
+		} else if(value == (byte)value) {
+			super.visitIntInsn(BIPUSH, value);
+		} else if(value == (short)value) {
+			super.visitIntInsn(SIPUSH, value);
+		} else {
+			super.visitLdcInsn(value);
 		}
-		return opcode;
 	}
 
-	protected void LoadOrStore(int index, String methodHandler, String methodSignature){
-		super.visitLdcInsn(index);
-		super.visitLdcInsn("var_" + index);
-		super.visitLdcInsn(count);
-		super.visitLdcInsn(mLine);
-		super.visitLdcInsn(mMethodIdentifier);
-		super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", methodHandler, methodSignature, false);
-
-		saveLocalLocation(mCounter, mCounter - 5, "var" + index);
-
-	}
-
-	void saveLocalLocation(int loadOrStore, int push, String oldName)
-	{
-		m_localLocation[m_localLocationCount] = new LocalInfo();
-		m_localLocation[m_localLocationCount].pushLocation = push; // instruction number
-		m_localLocation[m_localLocationCount].loadOrStoreLocation = loadOrStore; // instruction number
-		m_localLocation[m_localLocationCount].oldName = oldName;
-
-		m_localLocationCount++;
-	}
-
-    private void arrayStore(Type type, int storeOpCode, int loadOpCode, String methodName) {
-        int index = mLocalVariablesSorter.createLocalVariable(type);
-
-        mCounter += 7;
-        super.visitVarInsn(storeOpCode, index);
-        super.visitInsn(Opcodes.DUP2);
-        super.visitVarInsn(loadOpCode, index);
-        super.visitLdcInsn(count);
-        super.visitLdcInsn(mLine);
-        super.visitLdcInsn(mMethodIdentifier);
-        super.visitMethodInsn(Opcodes.INVOKESTATIC,
-                "com/asmproj/IFProfiler",
-                methodName,
-                Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(Object.class), 
-                		Type.INT_TYPE, type, Type.INT_TYPE, Type.INT_TYPE,
-                		Type.getType(String.class)),
-                false);
-        super.visitVarInsn(loadOpCode, index);
-    }
-    
-    private void checkForBasicBlock(){
-		if(line != -1){
-			super.visitLdcInsn(mClassName);
-			super.visitLdcInsn(mMethodName);
-			super.visitLdcInsn(mMethodSignature);
-			super.visitLdcInsn(line);
-			super.visitLdcInsn(mCounter);
-			super.visitMethodInsn(Opcodes.INVOKESTATIC, "com/asmproj/IFProfiler", "handleBasicBlockEntry", 
-					Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(String.class),
-							Type.getType(String.class), Type.getType(String.class), Type.INT_TYPE, Type.INT_TYPE), false);
-//			System.out.println("found basic block at line " + line);
-			line = -1;
+	private String getLocalVariableName(final int index){
+		if(localVariablesMap == null){
+			return "var_"+index;
 		}
-    }
-    
-    
-    private void arrayLoad(Type type, int loadOpcode, String methodName) {
-        mCounter += 6;
-        super.visitInsn(Opcodes.DUP2);
-        super.visitInsn(Opcodes.DUP2);
-        super.visitInsn(loadOpcode);
-        super.visitLdcInsn(count);
-        super.visitLdcInsn(mLine);
-        super.visitLdcInsn(mMethodIdentifier);
-        super.visitMethodInsn(Opcodes.INVOKESTATIC,
-                "com/asmproj/IFProfiler",
-                methodName,
-                Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(Object.class), Type.INT_TYPE, type, Type.INT_TYPE, Type.INT_TYPE, Type.getType(String.class)),
-                false);
-    }
+		if(localVariablesMap.containsKey(index)){
+			return localVariablesMap.get(index);
+		}
+		return "var_"+index;
+	}
+
+	private void localVariableUse(final int index){
+		addMethodInfo();
+		push(index);
+		super.visitLdcInsn(getLocalVariableName(index));
+		push(count);
+		push(mLine);
+		super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleLocalVariableUse", 
+				Type.getMethodDescriptor(VOID_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, INT_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE), 
+				false);
+	}
+
+	private void localVariableDef(final int index){
+		addMethodInfo();
+		push(index);
+		push(count);
+		push(mLine);
+		super.visitMethodInsn(INVOKESTATIC, PROFILER, "handleLocalVariableDef", 
+				Type.getMethodDescriptor(VOID_TYPE, STRING_TYPE, STRING_TYPE, STRING_TYPE, INT_TYPE, INT_TYPE, INT_TYPE), 
+				false);
+	}
+
+	public final void addMethodInfo(){
+		super.visitLdcInsn(mClassName);
+		super.visitLdcInsn(mMethodName);
+		super.visitLdcInsn(mMethodSignature);
+	}
+
+	public final void ALOAD_func(final int index){super.visitVarInsn(ALOAD, index);}
+	public final void Ldc_func(final Object cst){super.visitLdcInsn(cst);}
+	public final void Method_func(final String name, final String desc){
+		super.visitMethodInsn(INVOKESTATIC, PROFILER, name, desc, false);
+	}
+
+
+
+
+	/** Mnemonic for an illegal opcode. */
+	private static final String ILLEGAL_OPCODE = "<illegal opcode>";
+
+	/** cannot be computed statically */
+	private static final int UNPREDICTABLE = -1;
+
+	/** Illegal opcode. */
+	private static final int UNDEFINED = -2;
+
+	/**
+	 * Number of words consumed on operand stack by instructions.
+	 * Indexed by opcode.  CONSUME_STACK[FALOAD] = number of words
+	 * consumed from the stack by a faload instruction.
+	 */
+	private static final int[] CONSUME_STACK = {
+			0/*nop*/, 				0/*aconst_null*/,	0/*iconst_m1*/, 	0/*iconst_0*/, 		0/*iconst_1*/,
+			0/*iconst_2*/, 			0/*iconst_3*/, 		0/*iconst_4*/, 		0/*iconst_5*/, 		0/*lconst_0*/,
+			0/*lconst_1*/, 			0/*fconst_0*/, 		0/*fconst_1*/, 		0/*fconst_2*/,		0/*dconst_0*/,
+			0/*dconst_1*/, 			0/*bipush*/, 		0/*sipush*/, 		0/*ldc*/, 			0/*ldc_w*/, 
+			0/*ldc2_w*/, 			0/*iload*/,			0/*lload*/, 		0/*fload*/, 		0/*dload*/, 		
+			0/*aload*/, 			0/*iload_0*/, 		0/*iload_1*/, 		0/*iload_2*/,		0/*iload_3*/,
+			0/*lload_0*/,	 		0/*lload_1*/, 		0/*lload_2*/, 		0/*lload_3*/, 		0/*fload_0*/,
+			0/*fload_1*/,			0/*fload_2*/, 		0/*fload_3*/, 		0/*dload_0*/, 		0/*dload_1*/, 	
+			0/*dload_2*/,			0/*dload_3*/,		0/*aload_0*/, 		0/*aload_1*/, 		0/*aload_2*/, 	
+			0/*aload_3*/, 			2/*iaload*/,		2/*laload*/, 		2/*faload*/, 		2/*daload*/,
+			2/*aaload*/, 			2/*baload*/, 		2/*caload*/, 		2/*saload*/,		1/*istore*/,
+			2/*lstore*/, 			1/*fstore*/, 		2/*dstore*/, 		1/*astore*/, 		1/*istore_0*/,
+			1/*istore_1*/,			1/*istore_2*/, 		1/*istore_3*/, 		2/*lstore_0*/, 		2/*lstore_1*/,
+			2/*lstore_2*/, 			2/*lstore_3*/, 		1/*fstore_0*/, 		1/*fstore_1*/, 		1/*fstore_2*/,
+			1/*fstore_3*/, 			2/*dstore_0*/, 		2/*dstore_1*/, 		2/*dstore_2*/, 		2/*dstore_3*/,
+			1/*astore_0*/, 			1/*astore_1*/, 		1/*astore_2*/, 		1/*astore_3*/, 		3/*iastore*/, 
+			4/*lastore*/,			3/*fastore*/, 		4/*dastore*/, 		3/*aastore*/, 		3/*bastore*/, 		
+			3/*castore*/, 			3/*sastore*/,		1/*pop*/, 			2/*pop2*/, 			1/*dup*/, 
+			2/*dup_x1*/, 			3/*dup_x2*/, 		2/*dup2*/, 			3/*dup2_x1*/,		4/*dup2_x2*/,
+			2/*swap*/, 				2/*iadd*/, 			4/*ladd*/, 			2/*fadd*/, 			4/*dadd*/, 
+			2/*isub*/, 				4/*lsub*/,			2/*fsub*/,			4/*dsub*/, 			2/*imul*/, 
+			4/*lmul*/, 				2/*fmul*/, 			4/*dmul*/, 			2/*idiv*/, 			4/*ldiv*/,
+			2/*fdiv*/, 				4/*ddiv*/, 			2/*irem*/, 			4/*lrem*/, 			2/*frem*/, 
+			4/*drem*/, 				1/*ineg*/, 			2/*lneg*/,			1/*fneg*/, 			2/*dneg*/,
+			2/*ishl*/, 				3/*lshl*/, 			2/*ishr*/, 			3/*lshr*/, 			2/*iushr*/, 
+			3/*lushr*/,				2/*iand*/,			4/*land*/,	 		2/*ior*/, 			4/*lor*/, 
+			2/*ixor*/, 				4/*lxor*/, 			0/*iinc*/,			1/*i2l*/, 			1/*i2f*/,
+			1/*i2d*/, 				2/*l2i*/, 			2/*l2f*/, 			2/*l2d*/, 			1/*f2i*/, 
+			1/*f2l*/,				1/*f2d*/, 			2/*d2i*/, 			2/*d2l*/, 			2/*d2f*/, 
+			1/*i2b*/, 				1/*i2c*/, 			1/*i2s*/,			4/*lcmp*/, 			2/*fcmpl*/,
+			2/*fcmpg*/, 			4/*dcmpl*/, 		4/*dcmpg*/, 		1/*ifeq*/, 			1/*ifne*/,
+			1/*iflt*/, 				1/*ifge*/, 			1/*ifgt*/, 			1/*ifle*/, 			2/*if_icmpeq*/,
+			2/*if_icmpne*/, 		2/*if_icmplt*/,		2 /*if_icmpge*/,	2/*if_icmpgt*/, 	2/*if_icmple*/, 
+			2/*if_acmpeq*/, 		2/*if_acmpne*/,		0/*goto*/,			0/*jsr*/, 			0/*ret*/, 
+			1/*tableswitch*/, 		1/*lookupswitch*/, 	1/*ireturn*/,		2/*lreturn*/, 		1/*freturn*/,
+			2/*dreturn*/, 			1/*areturn*/, 		0/*return*/, 		0/*getstatic*/,		UNPREDICTABLE/*putstatic*/, 		
+			1/*getfield*/, 		
+			UNPREDICTABLE/*putfield*/,	
+			UNPREDICTABLE/*invokevirtual*/, 	
+			UNPREDICTABLE/*invokespecial*/,
+			UNPREDICTABLE/*invokestatic*/,
+			UNPREDICTABLE/*invokeinterface*/, 	
+			UNPREDICTABLE/*invokedynamic*/, 
+			0/*new*/, 			1/*newarray*/, 		1/*anewarray*/,		
+			1/*arraylength*/,		1/*athrow*/,		1/*checkcast*/, 	1/*instanceof*/, 	1/*monitorenter*/,	
+			1/*monitorexit*/,		UNDEFINED,			
+			UNPREDICTABLE/*multianewarray*/, 
+			1/*ifnull*/, 		1/*ifnonnull*/,
+	};
+
+	/**
+	 * Number of words produced onto operand stack by instructions.
+	 * Indexed by opcode.  CONSUME_STACK[DALOAD] = number of words
+	 * consumed from the stack by a daload instruction.
+	 */
+	private static final int[] PRODUCE_STACK = {
+			0/*nop*/, 1/*aconst_null*/, 1/*iconst_m1*/, 1/*iconst_0*/, 1/*iconst_1*/,
+			1/*iconst_2*/, 1/*iconst_3*/, 1/*iconst_4*/, 1/*iconst_5*/, 2/*lconst_0*/,
+			2/*lconst_1*/, 1/*fconst_0*/, 1/*fconst_1*/, 1/*fconst_2*/, 2/*dconst_0*/,
+			2/*dconst_1*/, 1/*bipush*/, 1/*sipush*/, 1/*ldc*/, 1/*ldc_w*/, 2/*ldc2_w*/, 1/*iload*/,
+			2/*lload*/, 1/*fload*/, 2/*dload*/, 1/*aload*/, 1/*iload_0*/, 1/*iload_1*/, 1/*iload_2*/,
+			1/*iload_3*/, 2/*lload_0*/, 2/*lload_1*/, 2/*lload_2*/, 2/*lload_3*/, 1/*fload_0*/,
+			1/*fload_1*/, 1/*fload_2*/, 1/*fload_3*/, 2/*dload_0*/, 2/*dload_1*/, 2/*dload_2*/,
+			2/*dload_3*/, 1/*aload_0*/, 1/*aload_1*/, 1/*aload_2*/, 1/*aload_3*/, 1/*iaload*/,
+			2/*laload*/, 1/*faload*/, 2/*daload*/, 1/*aaload*/, 1/*baload*/, 1/*caload*/, 1/*saload*/,
+			0/*istore*/, 0/*lstore*/, 0/*fstore*/, 0/*dstore*/, 0/*astore*/, 0/*istore_0*/,
+			0/*istore_1*/, 0/*istore_2*/, 0/*istore_3*/, 0/*lstore_0*/, 0/*lstore_1*/,
+			0/*lstore_2*/, 0/*lstore_3*/, 0/*fstore_0*/, 0/*fstore_1*/, 0/*fstore_2*/,
+			0/*fstore_3*/, 0/*dstore_0*/, 0/*dstore_1*/, 0/*dstore_2*/, 0/*dstore_3*/,
+			0/*astore_0*/, 0/*astore_1*/, 0/*astore_2*/, 0/*astore_3*/, 0/*iastore*/, 0/*lastore*/,
+			0/*fastore*/, 0/*dastore*/, 0/*aastore*/, 0/*bastore*/, 0/*castore*/, 0/*sastore*/,
+			0/*pop*/, 0/*pop2*/, 2/*dup*/, 3/*dup_x1*/, 4/*dup_x2*/, 4/*dup2*/, 5/*dup2_x1*/,
+			6/*dup2_x2*/, 2/*swap*/, 1/*iadd*/, 2/*ladd*/, 1/*fadd*/, 2/*dadd*/, 1/*isub*/, 2/*lsub*/,
+			1/*fsub*/, 2/*dsub*/, 1/*imul*/, 2/*lmul*/, 1/*fmul*/, 2/*dmul*/, 1/*idiv*/, 2/*ldiv*/,
+			1/*fdiv*/, 2/*ddiv*/, 1/*irem*/, 2/*lrem*/, 1/*frem*/, 2/*drem*/, 1/*ineg*/, 2/*lneg*/,
+			1/*fneg*/, 2/*dneg*/, 1/*ishl*/, 2/*lshl*/, 1/*ishr*/, 2/*lshr*/, 1/*iushr*/, 2/*lushr*/,
+			1/*iand*/, 2/*land*/, 1/*ior*/, 2/*lor*/, 1/*ixor*/, 2/*lxor*/,
+			0/*iinc*/, 2/*i2l*/, 1/*i2f*/, 2/*i2d*/, 1/*l2i*/, 1/*l2f*/, 2/*l2d*/, 1/*f2i*/,
+			2/*f2l*/, 2/*f2d*/, 1/*d2i*/, 2/*d2l*/, 1/*d2f*/,
+			1/*i2b*/, 1/*i2c*/, 1/*i2s*/, 1/*lcmp*/, 1/*fcmpl*/, 1/*fcmpg*/,
+			1/*dcmpl*/, 1/*dcmpg*/, 0/*ifeq*/, 0/*ifne*/, 0/*iflt*/, 0/*ifge*/, 0/*ifgt*/, 0/*ifle*/,
+			0/*if_icmpeq*/, 0/*if_icmpne*/, 0/*if_icmplt*/, 0/*if_icmpge*/, 0/*if_icmpgt*/,
+			0/*if_icmple*/, 0/*if_acmpeq*/, 0/*if_acmpne*/, 0/*goto*/, 1/*jsr*/, 0/*ret*/,
+			0/*tableswitch*/, 0/*lookupswitch*/, 0/*ireturn*/, 0/*lreturn*/, 0/*freturn*/,
+			0/*dreturn*/, 0/*areturn*/, 0/*return*/, UNPREDICTABLE/*getstatic*/, 0/*putstatic*/,
+			UNPREDICTABLE/*getfield*/, 0/*putfield*/, UNPREDICTABLE/*invokevirtual*/,
+			UNPREDICTABLE/*invokespecial*/, UNPREDICTABLE/*invokestatic*/,
+			UNPREDICTABLE/*invokeinterface*/, UNPREDICTABLE/*invokedynamic*/, 1/*new*/, 1/*newarray*/, 1/*anewarray*/,
+			1/*arraylength*/, 1/*athrow*/, 1/*checkcast*/, 1/*instanceof*/, 0/*monitorenter*/,
+			0/*monitorexit*/, UNDEFINED, 1/*multianewarray*/, 0/*ifnull*/, 0/*ifnonnull*/,
+	};	
+
+	/**
+	 * Names of opcodes.  Indexed by opcode.  OPCODE_NAMES[ALOAD] = "aload".
+	 */
+	private static final String[] OPCODE_NAMES = {
+			"nop", "aconst_null", "iconst_m1", "iconst_0", "iconst_1",
+			"iconst_2", "iconst_3", "iconst_4", "iconst_5", "lconst_0",
+			"lconst_1", "fconst_0", "fconst_1", "fconst_2", "dconst_0",
+			"dconst_1", "bipush", "sipush", "ldc", "ldc_w", "ldc2_w", "iload",
+			"lload", "fload", "dload", "aload", "iload_0", "iload_1", "iload_2",
+			"iload_3", "lload_0", "lload_1", "lload_2", "lload_3", "fload_0",
+			"fload_1", "fload_2", "fload_3", "dload_0", "dload_1", "dload_2",
+			"dload_3", "aload_0", "aload_1", "aload_2", "aload_3", "iaload",
+			"laload", "faload", "daload", "aaload", "baload", "caload", "saload",
+			"istore", "lstore", "fstore", "dstore", "astore", "istore_0",
+			"istore_1", "istore_2", "istore_3", "lstore_0", "lstore_1",
+			"lstore_2", "lstore_3", "fstore_0", "fstore_1", "fstore_2",
+			"fstore_3", "dstore_0", "dstore_1", "dstore_2", "dstore_3",
+			"astore_0", "astore_1", "astore_2", "astore_3", "iastore", "lastore",
+			"fastore", "dastore", "aastore", "bastore", "castore", "sastore",
+			"pop", "pop2", "dup", "dup_x1", "dup_x2", "dup2", "dup2_x1",
+			"dup2_x2", "swap", "iadd", "ladd", "fadd", "dadd", "isub", "lsub",
+			"fsub", "dsub", "imul", "lmul", "fmul", "dmul", "idiv", "ldiv",
+			"fdiv", "ddiv", "irem", "lrem", "frem", "drem", "ineg", "lneg",
+			"fneg", "dneg", "ishl", "lshl", "ishr", "lshr", "iushr", "lushr",
+			"iand", "land", "ior", "lor", "ixor", "lxor", "iinc", "i2l", "i2f",
+			"i2d", "l2i", "l2f", "l2d", "f2i", "f2l", "f2d", "d2i", "d2l", "d2f",
+			"i2b", "i2c", "i2s", "lcmp", "fcmpl", "fcmpg",
+			"dcmpl", "dcmpg", "ifeq", "ifne", "iflt", "ifge", "ifgt", "ifle",
+			"if_icmpeq", "if_icmpne", "if_icmplt", "if_icmpge", "if_icmpgt",
+			"if_icmple", "if_acmpeq", "if_acmpne", "goto", "jsr", "ret",
+			"tableswitch", "lookupswitch", "ireturn", "lreturn", "freturn",
+			"dreturn", "areturn", "return", "getstatic", "putstatic", "getfield",
+			"putfield", "invokevirtual", "invokespecial", "invokestatic",
+			"invokeinterface", "invokedynamic", "new", "newarray", "anewarray",
+			"arraylength", "athrow", "checkcast", "instanceof", "monitorenter",
+			"monitorexit", ILLEGAL_OPCODE, "multianewarray", "ifnull", "ifnonnull"
+	};	
+	
+	
+	
+	class ALOAD_0_Instruction implements Runnable{
+		MyMethodVisitor mv;
+		ALOAD_0_Instruction(MyMethodVisitor mv){
+			this.mv = mv;
+		}
+		@Override
+		public void run() {
+			mv.ALOAD_func(0);
+		}
+	}
+	class LDC_Instruction implements Runnable {
+		MyMethodVisitor mv;
+		final Object obj;
+		public LDC_Instruction(MyMethodVisitor mv, final Object obj){
+			this.mv = mv;
+			this.obj = obj;
+		}
+		@Override
+		public void run() {
+			mv.Ldc_func(obj);
+		}
+	}
+	class Push_Instruction implements Runnable{
+		MyMethodVisitor mv;
+		final int cst; 
+		public Push_Instruction(MyMethodVisitor mv, final int cst) {
+			this.mv = mv;
+			this.cst = cst;
+		}
+		@Override
+		public void run() {
+			mv.push(cst);
+		}
+	}
+	class Method_Instruction implements Runnable{
+		MyMethodVisitor mv;
+		final String methodName;
+		final String methodDesc;
+		public Method_Instruction(MyMethodVisitor mv, final String name, final String desc) {
+			this.mv = mv;
+			this.methodName = name;
+			this.methodDesc = desc;
+			
+		}
+		@Override
+		public void run() {
+			mv.Method_func(methodName, methodDesc);
+		}
+	}
 }

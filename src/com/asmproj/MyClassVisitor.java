@@ -6,23 +6,29 @@ public class MyClassVisitor extends ClassVisitor {
 
 	protected String cClassName;
 	protected MyMethodVisitor mMethodVisitor;
+	protected boolean foundStaticBlock;
 	protected String cJarFile;
 	
 	
     private MyClassVisitor(int api) {
         super(api);
+        foundStaticBlock = false;
+        mMethodVisitor = null;
+        cJarFile = "N/A";
     }
 
     public MyClassVisitor(int api, ClassVisitor cv) {
         super(api, cv);
         mMethodVisitor = null;
         cJarFile = "N/A";
+        foundStaticBlock = false;
     }
     
     public MyClassVisitor(int api, ClassVisitor cv, String jarFile) {
         super(api, cv);
         mMethodVisitor = null;
         cJarFile = jarFile;
+        foundStaticBlock = false;
     }
 
     @Override
@@ -41,9 +47,15 @@ public class MyClassVisitor extends ClassVisitor {
     @Override
     public MethodVisitor visitMethod(int access, final String name, String desc, String signature, String[] exceptions) {
         System.out.println("Visiting method: " + name + desc);
+        if(!foundStaticBlock){
+        	foundStaticBlock = name.equals("<clinit>");
+        }
+        
+        
         MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions);
         mMethodVisitor = new MyMethodVisitor(api, mv, access, name, desc, signature, cClassName, exceptions, cJarFile);
-        return mMethodVisitor;
+        mMethodVisitor.mLocalVariablesSorter = new MyLocalVariableSorter(api, access, desc, mMethodVisitor);
+        return mMethodVisitor.mLocalVariablesSorter;
     }
 
     /**
@@ -97,8 +109,7 @@ public class MyClassVisitor extends ClassVisitor {
 
     @Override
     public void visitEnd() {
-    	if(mMethodVisitor != null){
-    		if(!mMethodVisitor.staticBlockFound){
+    	if(!foundStaticBlock){
     			MethodVisitor mv = super.visitMethod(Opcodes.ACC_STATIC, "<clinit>", 
     					Type.getMethodDescriptor(Type.VOID_TYPE), null, null);
     			mv.visitCode();
@@ -112,7 +123,6 @@ public class MyClassVisitor extends ClassVisitor {
     	    	mv.visitInsn(Opcodes.RETURN);
     	    	mv.visitMaxs(0, 0);
     	    	mv.visitEnd();
-    		}  		
     	}
     	
         System.out.println("Class ends here");
